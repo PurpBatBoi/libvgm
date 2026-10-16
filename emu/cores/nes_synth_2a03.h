@@ -23,8 +23,8 @@
 	SOFTWARE.
 */
 
-#ifndef __NES_SYNTH_TETA_H__
-#define __NES_SYNTH_TETA_H__
+#ifndef __NES_SYNTH_2A03_H__
+#define __NES_SYNTH_2A03_H__
 
 #include <stdlib.h>
 #include <string.h>
@@ -32,8 +32,8 @@
 
 #include "../../stdtype.h"
 
-#define TETA_PI	3.14159265358979323846
-#define TETA_TAU	(2.0 * TETA_PI)
+#define SYNTH_PI	3.14159265358979323846
+#define SYNTH_TAU	(2.0 * SYNTH_PI)
 
 
 /* ---- Band-limited synthesis ----
@@ -92,11 +92,11 @@ static void synth_build_kernel(SYNTH* s)
 			}
 			else
 			{
-				float pi_x = (float)TETA_PI * x;
+				float pi_x = (float)SYNTH_PI * x;
 				sinc = (float)sin(pi_x) / pi_x;
 			}
 			w = ((float)tap + 1.0f - offset) / SYNTH_WIDTH;
-			window = (float)(0.42 - 0.5 * cos(TETA_TAU * w) + 0.08 * cos(2.0 * TETA_TAU * w));
+			window = (float)(0.42 - 0.5 * cos(SYNTH_TAU * w) + 0.08 * cos(2.0 * SYNTH_TAU * w));
 			taps[tap] = sinc * window;
 		}
 		for (tap = 0; tap < SYNTH_WIDTH; tap ++)
@@ -233,7 +233,7 @@ typedef struct
 static void low_pass_init(LOW_PASS* f, float sample_rate, float cutoff)
 {
 	float period = 1.0f / sample_rate;
-	float rc = (float)(1.0 / (TETA_TAU * cutoff));
+	float rc = (float)(1.0 / (SYNTH_TAU * cutoff));
 
 	f->alpha = period / (rc + period);
 	f->output = 0.0f;
@@ -283,4 +283,4 @@ static float filter_consume(FILTER_CHAIN* f, float sample)
 }
 
 
-#endif	/* __NES_SYNTH_TETA_H__ */
+#endif	/* __NES_SYNTH_2A03_H__ */
