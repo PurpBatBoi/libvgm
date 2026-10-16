@@ -44,11 +44,11 @@ const DEV_DECL sndDev_GB_DMG =
 	DeviceChannelNames,
 	DeviceLinkIDs,
 	{	// cores
-#ifdef EC_GB_SAMEBOY
-		&devDef_GB_SameBoy,
-#endif
 #ifdef EC_GB_MAME
 		&devDef_GB_MAME,
+#endif
+#ifdef EC_GB_SAMEBOY
+		&devDef_GB_SameBoy,
 #endif
 		NULL
 	}

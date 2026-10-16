@@ -564,8 +564,8 @@ UINT8 S98Player::GetSongDeviceInfo(std::vector<PLR_DEV_INFO>& devInfList) const
 		}
 		else
 		{
-			const DEV_DECL* devDecl = SndEmu_GetDevDecl(devType, _userDevList, _devStartOpts);
-			const DEVLINK_IDS* dlIds = devDecl->linkDevIDs((const DEV_GEN_CFG*)&_devCfgs[curDev].data[0]);
+			const DEV_DECL* devDecl = SndEmu_GetDevDecl(devType, _userDevList, _devStartOpts);	// NULL when this build doesn't include the device
+			const DEVLINK_IDS* dlIds = (devDecl != NULL) ? devDecl->linkDevIDs((const DEV_GEN_CFG*)&_devCfgs[curDev].data[0]) : NULL;
 			if (dlIds != NULL && dlIds->devCount > 0)
 				diIdx += dlIds->devCount;
 		}
@@ -621,7 +621,7 @@ UINT8 S98Player::GetSongDeviceInfo(std::vector<PLR_DEV_INFO>& devInfList) const
 			devInf.volume = 0x100;
 			devInf.smplRate = 0;
 			
-			const DEVLINK_IDS* dlIds = devInf.devDecl->linkDevIDs(devInf.devCfg);
+			const DEVLINK_IDS* dlIds = (devInf.devDecl != NULL) ? devInf.devDecl->linkDevIDs(devInf.devCfg) : NULL;
 			if (dlIds != NULL && dlIds->devCount > 0)
 			{
 				size_t curLDev;

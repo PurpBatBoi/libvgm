@@ -6,9 +6,6 @@
 #ifdef EC_SN76496_MAME
 #include "sn76496.h"
 #endif
-#ifdef EC_SN76496_MAXIM
-#include "sn76489.h"
-#endif
 
 
 static const char* DeviceName(const DEV_GEN_CFG* devCfg)
@@ -76,9 +73,6 @@ const DEV_DECL sndDev_SN76496 =
 	{	// cores
 #ifdef EC_SN76496_MAME
 		&devDef_SN76496_MAME,
-#endif
-#ifdef EC_SN76496_MAXIM
-		&devDef_SN76489_Maxim,
 #endif
 		NULL
 	}

@@ -6,7 +6,6 @@
 #ifndef SNDDEV_SELECT
 // undefine one of the variables to disable the cores
 #define EC_C6280_MAME		// enable HuC6280 core from MAME
-#define EC_C6280_OOTAKE		// enable Ootake PSG core
 #define EC_C6280_HUCA		// enable huc6280a core (MIT)
 #endif
 

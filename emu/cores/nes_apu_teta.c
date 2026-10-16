@@ -1087,17 +1087,18 @@ void nesapu_teta_update(void* chip, UINT32 samples, DEV_SMPL** outputs)
 
 	while (done < samples)
 	{
-		INT64 needed = ((INT64)(samples - done) << SYNTH_FRAC_BITS) - s->offset;
+		UINT32 request = samples - done;
 		UINT32 cycles;
 		UINT32 count;
 		UINT32 i;
 		UINT8 chn;
 
-		/* The fewest cycles that complete the remaining samples, at most one block. */
-		if (needed > (INT64)CYCLE_SIZE * s->samples_per_cycle)
+		/* Process at most one synth block; the BLEP buffer owns the exact clock/sample phase. */
+		if (request >= s->length)
+			request = s->length - 1;
+		cycles = synth_clocks_needed(s, request);
+		if (cycles > CYCLE_SIZE)
 			cycles = CYCLE_SIZE;
-		else
-			cycles = (UINT32)((needed + s->samples_per_cycle - 1) / s->samples_per_cycle);
 		apu_clock_to(apu, cycles);
 		count = synth_end_block(s, cycles);
 		if (count > samples - done)
@@ -1109,8 +1110,6 @@ void nesapu_teta_update(void* chip, UINT32 samples, DEV_SMPL** outputs)
 			for (i = 0; i < count; i ++)
 				outputs[chn][done + i] = (DEV_SMPL)(filter_consume(&apu->filter[chn], apu->block[i]) * 0x8000);
 		}
-		synth_consume(s, count);
-
 		/* Start the next block, putting every cycle counter back to zero. The channels are
 			level with master_clock here. */
 		apu->cpu_cycle += cycles;

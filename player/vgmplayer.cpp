@@ -572,8 +572,8 @@ UINT8 VGMPlayer::GetSongDeviceInfo(std::vector<PLR_DEV_INFO>& devInfList) const
 		}
 		else
 		{
-			const DEV_DECL* devDecl = SndEmu_GetDevDecl(devType, _userDevList, _devStartOpts);
-			const DEVLINK_IDS* dlIds = devDecl->linkDevIDs((const DEV_GEN_CFG*)&sdCfg.cfgData[0]);
+			const DEV_DECL* devDecl = SndEmu_GetDevDecl(devType, _userDevList, _devStartOpts);	// NULL when this build doesn't include the device
+			const DEVLINK_IDS* dlIds = (devDecl != NULL) ? devDecl->linkDevIDs((const DEV_GEN_CFG*)&sdCfg.cfgData[0]) : NULL;
 			if (dlIds != NULL && dlIds->devCount > 0)
 				diIdx += dlIds->devCount;
 		}
@@ -632,7 +632,7 @@ UINT8 VGMPlayer::GetSongDeviceInfo(std::vector<PLR_DEV_INFO>& devInfList) const
 			devInf.volume = GetChipVolume(sdCfg.vgmChipType, sdCfg.instance, 0);
 			devInf.smplRate = 0;
 			
-			const DEVLINK_IDS* dlIds = devInf.devDecl->linkDevIDs(dCfg);
+			const DEVLINK_IDS* dlIds = (devInf.devDecl != NULL) ? devInf.devDecl->linkDevIDs(dCfg) : NULL;
 			if (dlIds != NULL && dlIds->devCount > 0)
 			{
 				size_t curLDev;
@@ -1506,13 +1506,9 @@ void VGMPlayer::InitDevices(void)
 			SndEmu_GetDeviceFunc(devInf->devDef, RWF_REGISTER | RWF_WRITE, DEVRW_A8D8, 0, (void**)&chipDev.write8);
 			break;
 		case DEVID_RF5C68:
+			// MAME is the only RF5C68 core in this build; it also stands in for the RF5C164 (Gens).
 			if (! devCfg->emuCore)
-			{
-				if (devCfg->flags == 1)	// RF5C164
-					devCfg->emuCore = FCC_GENS;
-				else //if (devCfg->flags == 0)	// RF5C68
-					devCfg->emuCore = FCC_MAME;
-			}
+				devCfg->emuCore = FCC_MAME;
 			retVal = SndEmu_Start2(chipType, devCfg, devInf, _userDevList, _devStartOpts);
 			if (retVal)
 				break;
@@ -1573,7 +1569,7 @@ void VGMPlayer::InitDevices(void)
 					chipDev.flags |= 0x01;	// enable QSound hacks (required for proper playback of old VGMs)
 			}
 			if (! devCfg->emuCore)
-				devCfg->emuCore = FCC_CTR_;
+				devCfg->emuCore = FCC_MAME;	// the only QSound core in this build
 			retVal = SndEmu_Start2(chipType, devCfg, devInf, _userDevList, _devStartOpts);
 			if (retVal)
 				break;

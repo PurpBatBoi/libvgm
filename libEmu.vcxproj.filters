@@ -18,9 +18,6 @@
     <None Include="ReadMe.txt" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="emu\cores\sn76489.c">
-      <Filter>Quelldateien</Filter>
-    </ClCompile>
     <ClCompile Include="emu\cores\sn76496.c">
       <Filter>Quelldateien</Filter>
     </ClCompile>
@@ -45,18 +42,6 @@
     <ClCompile Include="emu\cores\emu2413.c">
       <Filter>Quelldateien</Filter>
     </ClCompile>
-    <ClCompile Include="emu\cores\ym2413.c">
-      <Filter>Quelldateien</Filter>
-    </ClCompile>
-    <ClCompile Include="emu\cores\2612intf.c">
-      <Filter>Quelldateien</Filter>
-    </ClCompile>
-    <ClCompile Include="emu\cores\ym2612.c">
-      <Filter>Quelldateien</Filter>
-    </ClCompile>
-    <ClCompile Include="emu\cores\ym2151.c">
-      <Filter>Quelldateien</Filter>
-    </ClCompile>
     <ClCompile Include="emu\cores\segapcm.c">
       <Filter>Quelldateien</Filter>
     </ClCompile>
@@ -66,43 +51,7 @@
     <ClCompile Include="emu\cores\rf5cintf.c">
       <Filter>Quelldateien</Filter>
     </ClCompile>
-    <ClCompile Include="emu\cores\scd_pcm.c">
-      <Filter>Quelldateien</Filter>
-    </ClCompile>
-    <ClCompile Include="emu\cores\fmopn.c">
-      <Filter>Quelldateien</Filter>
-    </ClCompile>
-    <ClCompile Include="emu\cores\opnintf.c">
-      <Filter>Quelldateien</Filter>
-    </ClCompile>
-    <ClCompile Include="emu\cores\ymdeltat.c">
-      <Filter>Quelldateien</Filter>
-    </ClCompile>
-    <ClCompile Include="emu\cores\fmopl.c">
-      <Filter>Quelldateien</Filter>
-    </ClCompile>
-    <ClCompile Include="emu\cores\adlibemu_opl2.c">
-      <Filter>Quelldateien</Filter>
-    </ClCompile>
-    <ClCompile Include="emu\cores\adlibemu_opl3.c">
-      <Filter>Quelldateien</Filter>
-    </ClCompile>
-    <ClCompile Include="emu\cores\adlibemu_opl_inc.c">
-      <Filter>Quelldateien</Filter>
-    </ClCompile>
-    <ClCompile Include="emu\cores\oplintf.c">
-      <Filter>Quelldateien</Filter>
-    </ClCompile>
-    <ClCompile Include="emu\cores\262intf.c">
-      <Filter>Quelldateien</Filter>
-    </ClCompile>
-    <ClCompile Include="emu\cores\ymf262.c">
-      <Filter>Quelldateien</Filter>
-    </ClCompile>
     <ClCompile Include="emu\cores\ymz280b.c">
-      <Filter>Quelldateien</Filter>
-    </ClCompile>
-    <ClCompile Include="emu\cores\ymf278b.c">
       <Filter>Quelldateien</Filter>
     </ClCompile>
     <ClCompile Include="emu\cores\ymf271.c">
@@ -117,22 +66,7 @@
     <ClCompile Include="emu\cores\emu2149.c">
       <Filter>Quelldateien</Filter>
     </ClCompile>
-    <ClCompile Include="emu\cores\pwm.c">
-      <Filter>Quelldateien</Filter>
-    </ClCompile>
-    <ClCompile Include="emu\cores\nes_apu.c">
-      <Filter>Quelldateien</Filter>
-    </ClCompile>
     <ClCompile Include="emu\cores\nesintf.c">
-      <Filter>Quelldateien</Filter>
-    </ClCompile>
-    <ClCompile Include="emu\cores\np_nes_apu.c">
-      <Filter>Quelldateien</Filter>
-    </ClCompile>
-    <ClCompile Include="emu\cores\np_nes_dmc.c">
-      <Filter>Quelldateien</Filter>
-    </ClCompile>
-    <ClCompile Include="emu\cores\np_nes_fds.c">
       <Filter>Quelldateien</Filter>
     </ClCompile>
     <ClCompile Include="emu\cores\gb.c">
@@ -168,19 +102,10 @@
     <ClCompile Include="emu\cores\c6280_mame.c">
       <Filter>Quelldateien</Filter>
     </ClCompile>
-    <ClCompile Include="emu\cores\Ootake_PSG.c">
-      <Filter>Quelldateien</Filter>
-    </ClCompile>
     <ClCompile Include="emu\cores\c6280intf.c">
       <Filter>Quelldateien</Filter>
     </ClCompile>
     <ClCompile Include="emu\cores\pokey.c">
-      <Filter>Quelldateien</Filter>
-    </ClCompile>
-    <ClCompile Include="emu\cores\vsu.c">
-      <Filter>Quelldateien</Filter>
-    </ClCompile>
-    <ClCompile Include="emu\cores\ws_audio.c">
       <Filter>Quelldateien</Filter>
     </ClCompile>
     <ClCompile Include="emu\cores\es5503.c">
@@ -201,12 +126,6 @@
     <ClCompile Include="emu\cores\scsplfo.c">
       <Filter>Quelldateien</Filter>
     </ClCompile>
-    <ClCompile Include="emu\cores\es5506.c">
-      <Filter>Quelldateien</Filter>
-    </ClCompile>
-    <ClCompile Include="emu\cores\nukedopl3.c">
-      <Filter>Quelldateien</Filter>
-    </ClCompile>
     <ClCompile Include="emu\cores\okiadpcm.c">
       <Filter>Quelldateien</Filter>
     </ClCompile>
@@ -219,28 +138,10 @@
     <ClCompile Include="emu\cores\saaintf.c">
       <Filter>Quelldateien</Filter>
     </ClCompile>
-    <ClCompile Include="emu\cores\ym3438.c">
-      <Filter>Quelldateien</Filter>
-    </ClCompile>
-    <ClCompile Include="emu\cores\saa1099_vb.c">
-      <Filter>Quelldateien</Filter>
-    </ClCompile>
     <ClCompile Include="emu\cores\qsoundintf.c">
       <Filter>Quelldateien</Filter>
     </ClCompile>
     <ClCompile Include="emu\cores\qsound_mame.c">
-      <Filter>Quelldateien</Filter>
-    </ClCompile>
-    <ClCompile Include="emu\cores\qsound_ctr.c">
-      <Filter>Quelldateien</Filter>
-    </ClCompile>
-    <ClCompile Include="emu\cores\nukedopll.c">
-      <Filter>Quelldateien</Filter>
-    </ClCompile>
-    <ClCompile Include="emu\cores\nukedopm.c">
-      <Filter>Quelldateien</Filter>
-    </ClCompile>
-    <ClCompile Include="emu\cores\2151intf.c">
       <Filter>Quelldateien</Filter>
     </ClCompile>
     <ClCompile Include="emu\logging.c">
@@ -258,9 +159,6 @@
     <ClCompile Include="emu\cores\msm5205.c">
       <Filter>Quelldateien</Filter>
     </ClCompile>
-    <ClCompile Include="emu\cores\msm5232.c">
-      <Filter>Quelldateien</Filter>
-    </ClCompile>
     <ClCompile Include="emu\cores\bsmt2000.c">
       <Filter>Quelldateien</Filter>
     </ClCompile>
@@ -270,9 +168,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="emu\EmuStructs.h">
-      <Filter>Headerdateien</Filter>
-    </ClInclude>
-    <ClInclude Include="emu\cores\sn76489.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
     <ClInclude Include="emu\cores\sn76496.h">
@@ -320,22 +215,7 @@
     <ClInclude Include="emu\cores\opll_vrc7tone.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
-    <ClInclude Include="emu\cores\ym2413.h">
-      <Filter>Headerdateien</Filter>
-    </ClInclude>
     <ClInclude Include="emu\cores\2612intf.h">
-      <Filter>Headerdateien</Filter>
-    </ClInclude>
-    <ClInclude Include="emu\cores\fmopn.h">
-      <Filter>Headerdateien</Filter>
-    </ClInclude>
-    <ClInclude Include="emu\cores\ym2612_int.h">
-      <Filter>Headerdateien</Filter>
-    </ClInclude>
-    <ClInclude Include="emu\cores\ym2612.h">
-      <Filter>Headerdateien</Filter>
-    </ClInclude>
-    <ClInclude Include="emu\cores\ym2151.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
     <ClInclude Include="emu\cores\segapcm.h">
@@ -347,37 +227,7 @@
     <ClInclude Include="emu\cores\rf5cintf.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
-    <ClInclude Include="emu\cores\scd_pcm.h">
-      <Filter>Headerdateien</Filter>
-    </ClInclude>
-    <ClInclude Include="emu\cores\opnintf.h">
-      <Filter>Headerdateien</Filter>
-    </ClInclude>
-    <ClInclude Include="emu\cores\ymdeltat.h">
-      <Filter>Headerdateien</Filter>
-    </ClInclude>
-    <ClInclude Include="emu\cores\fmopl.h">
-      <Filter>Headerdateien</Filter>
-    </ClInclude>
-    <ClInclude Include="emu\cores\adlibemu.h">
-      <Filter>Headerdateien</Filter>
-    </ClInclude>
-    <ClInclude Include="emu\cores\adlibemu_opl_inc.h">
-      <Filter>Headerdateien</Filter>
-    </ClInclude>
-    <ClInclude Include="emu\cores\oplintf.h">
-      <Filter>Headerdateien</Filter>
-    </ClInclude>
-    <ClInclude Include="emu\cores\262intf.h">
-      <Filter>Headerdateien</Filter>
-    </ClInclude>
-    <ClInclude Include="emu\cores\ymf262.h">
-      <Filter>Headerdateien</Filter>
-    </ClInclude>
     <ClInclude Include="emu\cores\ymz280b.h">
-      <Filter>Headerdateien</Filter>
-    </ClInclude>
-    <ClInclude Include="emu\cores\ymf278b.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
     <ClInclude Include="emu\cores\ymf271.h">
@@ -395,25 +245,7 @@
     <ClInclude Include="emu\EmuHelper.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
-    <ClInclude Include="emu\cores\pwm.h">
-      <Filter>Headerdateien</Filter>
-    </ClInclude>
-    <ClInclude Include="emu\cores\nes_apu.h">
-      <Filter>Headerdateien</Filter>
-    </ClInclude>
-    <ClInclude Include="emu\cores\nes_defs.h">
-      <Filter>Headerdateien</Filter>
-    </ClInclude>
     <ClInclude Include="emu\cores\nesintf.h">
-      <Filter>Headerdateien</Filter>
-    </ClInclude>
-    <ClInclude Include="emu\cores\np_nes_apu.h">
-      <Filter>Headerdateien</Filter>
-    </ClInclude>
-    <ClInclude Include="emu\cores\np_nes_dmc.h">
-      <Filter>Headerdateien</Filter>
-    </ClInclude>
-    <ClInclude Include="emu\cores\np_nes_fds.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
     <ClInclude Include="emu\cores\gb.h">
@@ -449,22 +281,10 @@
     <ClInclude Include="emu\cores\c6280_mame.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
-    <ClInclude Include="emu\cores\Ootake_PSG.h">
-      <Filter>Headerdateien</Filter>
-    </ClInclude>
     <ClInclude Include="emu\cores\c6280intf.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
     <ClInclude Include="emu\cores\pokey.h">
-      <Filter>Headerdateien</Filter>
-    </ClInclude>
-    <ClInclude Include="emu\cores\vsu.h">
-      <Filter>Headerdateien</Filter>
-    </ClInclude>
-    <ClInclude Include="emu\cores\ws_audio.h">
-      <Filter>Headerdateien</Filter>
-    </ClInclude>
-    <ClInclude Include="emu\cores\ws_initialIo.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
     <ClInclude Include="emu\cores\es5503.h">
@@ -482,9 +302,6 @@
     <ClInclude Include="emu\cores\scspdsp.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
-    <ClInclude Include="emu\cores\es5506.h">
-      <Filter>Headerdateien</Filter>
-    </ClInclude>
     <ClInclude Include="emu\cores\okiadpcm.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
@@ -497,55 +314,16 @@
     <ClInclude Include="emu\cores\saaintf.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
-    <ClInclude Include="emu\cores\nukedopl3.h">
-      <Filter>Headerdateien</Filter>
-    </ClInclude>
-    <ClInclude Include="emu\cores\ym3438.h">
-      <Filter>Headerdateien</Filter>
-    </ClInclude>
-    <ClInclude Include="emu\cores\saa1099_vb.h">
-      <Filter>Headerdateien</Filter>
-    </ClInclude>
     <ClInclude Include="emu\cores\qsoundintf.h">
       <Filter>Quelldateien</Filter>
     </ClInclude>
     <ClInclude Include="emu\cores\qsound_mame.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
-    <ClInclude Include="emu\cores\qsound_ctr.h">
-      <Filter>Headerdateien</Filter>
-    </ClInclude>
-    <ClInclude Include="emu\cores\Ootake_PSG_private.h">
-      <Filter>Headerdateien</Filter>
-    </ClInclude>
     <ClInclude Include="emu\cores\emu2413_private.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
     <ClInclude Include="emu\cores\emu2149_private.h">
-      <Filter>Headerdateien</Filter>
-    </ClInclude>
-    <ClInclude Include="emu\cores\sn76489_private.h">
-      <Filter>Headerdateien</Filter>
-    </ClInclude>
-    <ClInclude Include="emu\cores\nukedopl3_int.h">
-      <Filter>Headerdateien</Filter>
-    </ClInclude>
-    <ClInclude Include="emu\cores\ym3438_int.h">
-      <Filter>Headerdateien</Filter>
-    </ClInclude>
-    <ClInclude Include="emu\cores\nukedopll.h">
-      <Filter>Headerdateien</Filter>
-    </ClInclude>
-    <ClInclude Include="emu\cores\nukedopll_int.h">
-      <Filter>Headerdateien</Filter>
-    </ClInclude>
-    <ClInclude Include="emu\cores\nukedopm_int.h">
-      <Filter>Headerdateien</Filter>
-    </ClInclude>
-    <ClInclude Include="emu\cores\nukedopm.h">
-      <Filter>Headerdateien</Filter>
-    </ClInclude>
-    <ClInclude Include="emu\cores\2151intf.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
     <ClInclude Include="emu\logging.h">

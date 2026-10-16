@@ -443,7 +443,7 @@ static void dump_info(PlayerBase *player) {
           devInfList[i].volume);
         devDefList = SndEmu_GetDevDefList(devInfList[i].type);
         fprintf(stderr,"    Cores:");
-        while(*devDefList) {
+        while(devDefList != NULL && *devDefList) { /* NULL: device not in this build */
             FCC2STR(str,(*devDefList)->coreID);
             fprintf(stderr," %s",str);
             devDefList++;

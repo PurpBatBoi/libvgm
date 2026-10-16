@@ -488,16 +488,17 @@ void nesfds_teta_update(void* chip, UINT32 samples, DEV_SMPL** outputs)
 	while (done < samples)
 	{
 		SYNTH* s = &fds->synth;
-		INT64 needed = ((INT64)(samples - done) << SYNTH_FRAC_BITS) - s->offset;
+		UINT32 request = samples - done;
 		UINT32 cycles;
 		UINT32 count;
 		UINT32 i;
 
-		/* The fewest cycles that complete the remaining samples, at most one block. */
-		if (needed > (INT64)CYCLE_SIZE * s->samples_per_cycle)
+		/* Process at most one synth block; the BLEP buffer owns the exact clock/sample phase. */
+		if (request >= s->length)
+			request = s->length - 1;
+		cycles = synth_clocks_needed(s, request);
+		if (cycles > CYCLE_SIZE)
 			cycles = CYCLE_SIZE;
-		else
-			cycles = (UINT32)((needed + s->samples_per_cycle - 1) / s->samples_per_cycle);
 		fds_run(fds, cycles);
 		count = synth_end_block(s, cycles);
 		if (count > samples - done)
@@ -512,7 +513,6 @@ void nesfds_teta_update(void* chip, UINT32 samples, DEV_SMPL** outputs)
 			outputs[0][done + i] += (DEV_SMPL)(y * fds->pan[0]);
 			outputs[1][done + i] += (DEV_SMPL)(y * fds->pan[1]);
 		}
-		synth_consume(s, count);
 		done += count;
 	}
 }

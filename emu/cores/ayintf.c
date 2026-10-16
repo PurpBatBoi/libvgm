@@ -66,11 +66,11 @@ const DEV_DECL sndDev_AY8910 =
 	DeviceChannelNames,
 	DeviceLinkIDs,
 	{	// cores
-#ifdef EC_AY8910_EMU2149
-		&devDef_YM2149_Emu,
-#endif
 #ifdef EC_AY8910_MAME
 		&devDef_AY8910_MAME,
+#endif
+#ifdef EC_AY8910_EMU2149
+		&devDef_YM2149_Emu,
 #endif
 		NULL
 	}

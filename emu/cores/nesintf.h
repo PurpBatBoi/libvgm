@@ -5,9 +5,6 @@
 
 #ifndef SNDDEV_SELECT
 // undefine one of the variables to disable the cores
-#define EC_NES_MAME			// enable NES core from MAME
-#define EC_NES_NSFPLAY		// enable NES core from NSFPlay
-#define EC_NES_NSFP_FDS		// enable FDS core from NSFPlay
 #define EC_NES_TETANES		// enable NES core ported from TetaNES
 // Note: The FDS core from NSFPlay is used by the MAME and NSFPlay NES cores.
 //       The TetaNES core has its own FDS core.

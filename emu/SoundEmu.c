@@ -10,22 +10,11 @@
 // if not asked to select certain sound devices, just include everything (comfort option)
 #define SNDDEV_SN76496
 #define SNDDEV_YM2413
-#define SNDDEV_YM2612
-#define SNDDEV_YM2151
 #define SNDDEV_SEGAPCM
 #define SNDDEV_RF5C68
-#define SNDDEV_YM2203
-#define SNDDEV_YM2608
-#define SNDDEV_YM2610
-#define SNDDEV_YM3812
-#define SNDDEV_YM3526
-#define SNDDEV_Y8950
-#define SNDDEV_YMF262
-#define SNDDEV_YMF278B
 #define SNDDEV_YMZ280B
 #define SNDDEV_YMF271
 #define SNDDEV_AY8910
-#define SNDDEV_32X_PWM
 #define SNDDEV_GAMEBOY
 #define SNDDEV_NES_APU
 #define SNDDEV_YMW258
@@ -41,11 +30,8 @@
 #define SNDDEV_POKEY
 #define SNDDEV_QSOUND
 #define SNDDEV_SCSP
-#define SNDDEV_WSWAN
-#define SNDDEV_VBOY_VSU
 #define SNDDEV_SAA1099
 #define SNDDEV_ES5503
-#define SNDDEV_ES5506
 #define SNDDEV_X1_010
 #define SNDDEV_C352
 #define SNDDEV_GA20
@@ -53,7 +39,6 @@
 #define SNDDEV_K007232
 #define SNDDEV_K005289
 #define SNDDEV_MSM5205
-#define SNDDEV_MSM5232
 #define SNDDEV_BSMT2000
 #define SNDDEV_ICS2115
 #define SNDDEV_YM2414
@@ -65,38 +50,17 @@
 #ifdef SNDDEV_YM2413
 #include "cores/2413intf.h"
 #endif
-#ifdef SNDDEV_YM2612
-#include "cores/2612intf.h"
-#endif
-#ifdef SNDDEV_YM2151
-#include "cores/2151intf.h"
-#endif
 #ifdef SNDDEV_SEGAPCM
 #include "cores/segapcm.h"
 #endif
 #ifdef SNDDEV_RF5C68
 #include "cores/rf5cintf.h"
 #endif
-#if defined(SNDDEV_YM2203) || defined(SNDDEV_YM2608) || defined(SNDDEV_YM2610)
-#include "cores/opnintf.h"
-#endif
-#if defined(SNDDEV_YM3812) || defined(SNDDEV_YM3526) || defined(SNDDEV_Y8950)
-#include "cores/oplintf.h"
-#endif
-#ifdef SNDDEV_YMF262
-#include "cores/262intf.h"
-#endif
-#ifdef SNDDEV_YMF278B
-#include "cores/ymf278b.h"
-#endif
 #ifdef SNDDEV_YMF271
 #include "cores/ymf271.h"
 #endif
 #ifdef SNDDEV_YMZ280B
 #include "cores/ymz280b.h"
-#endif
-#ifdef SNDDEV_32X_PWM
-#include "cores/pwm.h"
 #endif
 #ifdef SNDDEV_AY8910
 #include "cores/ayintf.h"
@@ -146,20 +110,11 @@
 #ifdef SNDDEV_SCSP
 #include "cores/scsp.h"
 #endif
-#ifdef SNDDEV_WSWAN
-#include "cores/ws_audio.h"
-#endif
-#ifdef SNDDEV_VBOY_VSU
-#include "cores/vsu.h"
-#endif
 #ifdef SNDDEV_SAA1099
 #include "cores/saaintf.h"
 #endif
 #ifdef SNDDEV_ES5503
 #include "cores/es5503.h"
-#endif
-#ifdef SNDDEV_ES5506
-#include "cores/es5506.h"
 #endif
 #ifdef SNDDEV_X1_010
 #include "cores/x1_010.h"
@@ -182,9 +137,6 @@
 #ifdef SNDDEV_MSM5205
 #include "cores/msm5205.h"
 #endif
-#ifdef SNDDEV_MSM5232
-#include "cores/msm5232.h"
-#endif
 #ifdef SNDDEV_BSMT2000
 #include "cores/bsmt2000.h"
 #endif
@@ -202,50 +154,17 @@ const DEV_DECL* sndEmu_Devices[] = {
 #ifdef SNDDEV_YM2413
 	&sndDev_YM2413,
 #endif
-#ifdef SNDDEV_YM2612
-	&sndDev_YM2612,
-#endif
-#ifdef SNDDEV_YM2151
-	&sndDev_YM2151,
-#endif
 #ifdef SNDDEV_SEGAPCM
 	&sndDev_SegaPCM,
 #endif
 #ifdef SNDDEV_RF5C68
 	&sndDev_RF5C68,
 #endif
-#ifdef SNDDEV_YM2203
-	&sndDev_YM2203,
-#endif
-#ifdef SNDDEV_YM2608
-	&sndDev_YM2608,
-#endif
-#ifdef SNDDEV_YM2610
-	&sndDev_YM2610,
-#endif
-#ifdef SNDDEV_YM3812
-	&sndDev_YM3812,
-#endif
-#ifdef SNDDEV_YM3526
-	&sndDev_YM3526,
-#endif
-#ifdef SNDDEV_Y8950
-	&sndDev_Y8950,
-#endif
-#ifdef SNDDEV_YMF262
-	&sndDev_YMF262,
-#endif
-#ifdef SNDDEV_YMF278B
-	&sndDev_YMF278B,
-#endif
 #ifdef SNDDEV_YMF271
 	&sndDev_YMF271,
 #endif
 #ifdef SNDDEV_YMZ280B
 	&sndDev_YMZ280B,
-#endif
-#ifdef SNDDEV_32X_PWM
-	&sndDev_32X_PWM,
 #endif
 #ifdef SNDDEV_AY8910
 	&sndDev_AY8910,
@@ -295,20 +214,11 @@ const DEV_DECL* sndEmu_Devices[] = {
 #ifdef SNDDEV_SCSP
 	&sndDev_SCSP,
 #endif
-#ifdef SNDDEV_WSWAN
-	&sndDev_WSwan,
-#endif
-#ifdef SNDDEV_VBOY_VSU
-	&sndDev_VBoyVSU,
-#endif
 #ifdef SNDDEV_SAA1099
 	&sndDev_SAA1099,
 #endif
 #ifdef SNDDEV_ES5503
 	&sndDev_ES5503,
-#endif
-#ifdef SNDDEV_ES5506
-	&sndDev_ES5506,
 #endif
 #ifdef SNDDEV_X1_010
 	&sndDev_X1_010,
@@ -330,9 +240,6 @@ const DEV_DECL* sndEmu_Devices[] = {
 #endif
 #ifdef SNDDEV_MSM5205
 	&sndDev_MSM5205,
-#endif
-#ifdef SNDDEV_MSM5232
-	&sndDev_MSM5232,
 #endif
 #ifdef SNDDEV_BSMT2000
 	&sndDev_BSMT2000,
@@ -503,10 +410,6 @@ const char* SndEmu_GetDevName(DEV_ID deviceID, UINT8 opts, const DEV_GEN_CFG* de
 #ifdef SNDDEV_GAMEBOY
 		case DEVID_GB_DMG:
 			return "GB DMG";
-#endif
-#ifdef SNDDEV_WSWAN
-		case DEVID_WSWAN:
-			return "WSwan";
 #endif
 		default:
 			devCfg = NULL;	// for all other devices, just look up names normally without configuration

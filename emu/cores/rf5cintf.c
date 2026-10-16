@@ -6,9 +6,6 @@
 #ifdef EC_RF5C68_MAME
 #include "rf5c68.h"
 #endif
-#ifdef EC_RF5C68_GENS
-#include "scd_pcm.h"
-#endif
 
 
 static const char* DeviceName(const DEV_GEN_CFG* devCfg)
@@ -48,9 +45,6 @@ const DEV_DECL sndDev_RF5C68 =
 	{	// cores
 #ifdef EC_RF5C68_MAME
 		&devDef_RF5C68_MAME,
-#endif
-#ifdef EC_RF5C68_GENS
-		&devDef_RF5C68_Gens,
 #endif
 		NULL
 	}

@@ -6,9 +6,6 @@
 #ifdef EC_C6280_MAME
 #include "c6280_mame.h"
 #endif
-#ifdef EC_C6280_OOTAKE
-#include "Ootake_PSG.h"
-#endif
 #ifdef EC_C6280_HUCA
 #include "huc6280a.h"
 #endif
@@ -42,9 +39,6 @@ const DEV_DECL sndDev_C6280 =
 	DeviceChannelNames,
 	DeviceLinkIDs,
 	{	// cores
-#ifdef EC_C6280_OOTAKE
-		&devDef_C6280_Ootake,
-#endif
 #ifdef EC_C6280_MAME
 		&devDef_C6280_MAME,
 #endif
