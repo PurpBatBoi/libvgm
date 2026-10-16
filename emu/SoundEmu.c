@@ -10,6 +10,7 @@
 // if not asked to select certain sound devices, just include everything (comfort option)
 #define SNDDEV_SN76496
 #define SNDDEV_YM2413
+#define SNDDEV_YM2612
 #define SNDDEV_SEGAPCM
 #define SNDDEV_RF5C68
 #define SNDDEV_YMZ280B
@@ -49,6 +50,9 @@
 #endif
 #ifdef SNDDEV_YM2413
 #include "cores/2413intf.h"
+#endif
+#ifdef SNDDEV_YM2612
+#include "cores/ym2612.h"
 #endif
 #ifdef SNDDEV_SEGAPCM
 #include "cores/segapcm.h"
@@ -153,6 +157,9 @@ const DEV_DECL* sndEmu_Devices[] = {
 #endif
 #ifdef SNDDEV_YM2413
 	&sndDev_YM2413,
+#endif
+#ifdef SNDDEV_YM2612
+	&sndDev_YM2612,
 #endif
 #ifdef SNDDEV_SEGAPCM
 	&sndDev_SegaPCM,

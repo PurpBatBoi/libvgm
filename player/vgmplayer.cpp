@@ -15,7 +15,7 @@
 #include "../emu/SoundDevs.h"
 #include "../emu/EmuCores.h"
 #include "../emu/cores/sn764intf.h"	// for SN76496_CFG
-#include "../emu/cores/2612intf.h"
+#include "../emu/cores/ym2612.h"
 #include "../emu/cores/segapcm.h"		// for SEGAPCM_CFG
 #include "../emu/cores/ayintf.h"		// for AY8910_CFG
 #include "../emu/cores/gbintf.h"

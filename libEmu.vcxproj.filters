@@ -45,6 +45,9 @@
     <ClCompile Include="emu\cores\segapcm.c">
       <Filter>Quelldateien</Filter>
     </ClCompile>
+    <ClCompile Include="emu\cores\ym2612.c">
+      <Filter>Quelldateien</Filter>
+    </ClCompile>
     <ClCompile Include="emu\cores\rf5c68.c">
       <Filter>Quelldateien</Filter>
     </ClCompile>
@@ -215,7 +218,7 @@
     <ClInclude Include="emu\cores\opll_vrc7tone.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
-    <ClInclude Include="emu\cores\2612intf.h">
+    <ClInclude Include="emu\cores\ym2612.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
     <ClInclude Include="emu\cores\segapcm.h">

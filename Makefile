@@ -169,8 +169,6 @@ LIBEMUOBJS = \
 	$(LIBEMUOBJ)/cores/emu2413.o \
 	$(LIBEMUOBJ)/cores/ym2413.o \
 	$(LIBEMUOBJ)/cores/nukedopll.o \
-	$(LIBEMUOBJ)/cores/2612intf.o \
-	$(LIBEMUOBJ)/cores/fmopn2612.o \
 	$(LIBEMUOBJ)/cores/ym2612.o \
 	$(LIBEMUOBJ)/cores/ym3438.o \
 	$(LIBEMUOBJ)/cores/ym2151.o \
