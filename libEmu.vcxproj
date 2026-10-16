@@ -159,7 +159,6 @@
     <ClCompile Include="emu\cores\c352.c" />
     <ClCompile Include="emu\cores\c6280intf.c" />
     <ClCompile Include="emu\cores\c6280_mame.c" />
-    <ClCompile Include="emu\cores\emu2149.c" />
     <ClCompile Include="emu\cores\emu2413.c" />
     <ClCompile Include="emu\cores\es5503.c" />
     <ClCompile Include="emu\cores\gb.c" />
@@ -217,8 +216,6 @@
     <ClInclude Include="emu\cores\c352.h" />
     <ClInclude Include="emu\cores\c6280intf.h" />
     <ClInclude Include="emu\cores\c6280_mame.h" />
-    <ClInclude Include="emu\cores\emu2149.h" />
-    <ClInclude Include="emu\cores\emu2149_private.h" />
     <ClInclude Include="emu\cores\emu2413.h" />
     <ClInclude Include="emu\cores\emu2413_private.h" />
     <ClInclude Include="emu\cores\emutypes.h" />

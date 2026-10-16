@@ -177,12 +177,8 @@ VGMPlayer::VGMPlayer() :
 			PLR_DEV_OPTS& devOpts = _devOpts[optID];
 			
 			InitDeviceOptions(devOpts);
-			if (devID == DEVID_AY8910)
-				devOpts.coreOpts = OPT_AY8910_PCM3CH_DETECT;
-			else if (devID == DEVID_NES_APU)
+			if (devID == DEVID_NES_APU)
 				devOpts.coreOpts = 0x01B7;
-			else if (devID == DEVID_GB_DMG)
-				devOpts.coreOpts = OPT_GB_DMG_HIGHPASS;
 			else if (devID == DEVID_SCSP)
 				devOpts.coreOpts = OPT_SCSP_BYPASS_DSP;
 			_devOptMap[devID][chipID] = optID;
@@ -1759,9 +1755,7 @@ void VGMPlayer::InitDevices(void)
 	}
 	else
 	{
-		if (dLink->devID == DEVID_AY8910)
-			dLink->cfg->emuCore = FCC_EMU_;
-		else if (dLink->devID == DEVID_YMF262)
+		if (dLink->devID == DEVID_YMF262)
 			dLink->cfg->emuCore = FCC_ADLE;
 	}
 	

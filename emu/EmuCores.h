@@ -3,7 +3,7 @@
 
 #define FCC_MAME	0x4D414D45	// MAME
 #define FCC_MAXM	0x4D41584D	// SN76489 by Maxim
-#define FCC_EMU_	0x454D5500	// EMU2413/EMU2149
+#define FCC_EMU_	0x454D5500	// EMU2413
 #define FCC_GPGX	0x47504758	// Genesis Plus GX
 #define FCC_GENS	0x47454E53	// Gens
 #define FCC_ADLE	0x41444C45	// AdLibEmu
@@ -18,8 +18,6 @@
 #define FCC_LAOO	0x4C414F4F	// laoo
 #define FCC_RN22	0x524E3232	// Mao757 (RN22)
 #define FCC_EITO	0x4549544F	// eito
-#define FCC_SBOY	0x53424F59	// SameBoy
 #define FCC_TETA	0x54455441	// TetaNES
-#define FCC_HUCA	0x48554341	// huc6280a
 
 #endif	// __EMUCORES_H__

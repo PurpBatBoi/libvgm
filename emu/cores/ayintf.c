@@ -6,9 +6,6 @@
 #ifdef EC_AY8910_MAME
 #include "ay8910.h"
 #endif
-#ifdef EC_AY8910_EMU2149
-#include "emu2149.h"
-#endif
 
 
 static const char* DeviceName(const DEV_GEN_CFG* devCfg)
@@ -68,9 +65,6 @@ const DEV_DECL sndDev_AY8910 =
 	{	// cores
 #ifdef EC_AY8910_MAME
 		&devDef_AY8910_MAME,
-#endif
-#ifdef EC_AY8910_EMU2149
-		&devDef_YM2149_Emu,
 #endif
 		NULL
 	}

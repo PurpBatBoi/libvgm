@@ -6,7 +6,6 @@
 #ifndef SNDDEV_SELECT
 // undefine one of the variables to disable the cores
 #define EC_AY8910_MAME		// enable AY8910 core from MAME
-#define EC_AY8910_EMU2149	// enable EMU2149 core (from NSFPlay)
 #endif
 
 
@@ -40,9 +39,6 @@ typedef struct ay8910_config
 	UINT8 chipType;
 	UINT8 chipFlags;
 } AY8910_CFG;
-
-
-#define OPT_AY8910_PCM3CH_DETECT	0x01	// enable 3-channel PCM detection and disable per-channel panning in that case
 
 
 extern const DEV_DECL sndDev_AY8910;

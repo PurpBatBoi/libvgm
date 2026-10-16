@@ -6,9 +6,6 @@
 #ifdef EC_GB_MAME
 #include "gb_mame.h"
 #endif
-#ifdef EC_GB_SAMEBOY
-#include "sameboy_apu.h"
-#endif
 
 
 static const char* DeviceName(const DEV_GEN_CFG* devCfg)
@@ -46,9 +43,6 @@ const DEV_DECL sndDev_GB_DMG =
 	{	// cores
 #ifdef EC_GB_MAME
 		&devDef_GB_MAME,
-#endif
-#ifdef EC_GB_SAMEBOY
-		&devDef_GB_SameBoy,
 #endif
 		NULL
 	}
