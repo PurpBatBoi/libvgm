@@ -12,57 +12,57 @@
 #include "nesintf.h"
 #include "../panning.h"
 
-#ifdef EC_NES_TETANES
-#include "nes_apu_teta.h"
-#include "nes_fds_teta.h"
+#ifdef EC_NES_APU2A03
+#include "nes_apu_2a03.h"
+#include "nes_fds_2a03.h"
 #endif
 
 
 typedef struct nesapu_info NESAPU_INF;
 
-static void nes_stream_update_teta(void* chip, UINT32 samples, DEV_SMPL** outputs);
+static void nes_stream_update_2a03(void* chip, UINT32 samples, DEV_SMPL** outputs);
 
-static UINT8 device_start_nes_teta(const DEV_GEN_CFG* cfg, DEV_INFO* retDevInf);
-static void device_stop_nes_teta(void* chip);
+static UINT8 device_start_nes_2a03(const DEV_GEN_CFG* cfg, DEV_INFO* retDevInf);
+static void device_stop_nes_2a03(void* chip);
 static void device_stop_nes_common(NESAPU_INF* info);
-static void device_reset_nes_teta(void* chip);
+static void device_reset_nes_2a03(void* chip);
 
-static void nes_w_teta(void* chip, UINT8 offset, UINT8 data);
-static UINT8 nes_r_teta(void* chip, UINT8 offset);
+static void nes_w_2a03(void* chip, UINT8 offset, UINT8 data);
+static UINT8 nes_r_2a03(void* chip, UINT8 offset);
 static void nes_write_ram(void* chip, UINT32 offset, UINT32 length, const UINT8* data);
 
-static void nes_set_chip_option_teta(void* chip, UINT32 NesOptions);
-static void nes_set_mute_mask_teta(void* chip, UINT32 MuteMask);
-static void nes_set_pan_teta(void* chip, const INT16* PanVals);
+static void nes_set_chip_option_2a03(void* chip, UINT32 NesOptions);
+static void nes_set_mute_mask_2a03(void* chip, UINT32 MuteMask);
+static void nes_set_pan_2a03(void* chip, const INT16* PanVals);
 
 
-#ifdef EC_NES_TETANES
-static DEVDEF_RWFUNC devFunc_TetaNES[] =
+#ifdef EC_NES_APU2A03
+static DEVDEF_RWFUNC devFunc_APU2A03[] =
 {
-	{RWF_REGISTER | RWF_WRITE, DEVRW_A8D8, 0, nes_w_teta},
-	{RWF_REGISTER | RWF_READ, DEVRW_A8D8, 0, nes_r_teta},
+	{RWF_REGISTER | RWF_WRITE, DEVRW_A8D8, 0, nes_w_2a03},
+	{RWF_REGISTER | RWF_READ, DEVRW_A8D8, 0, nes_r_2a03},
 	{RWF_MEMORY | RWF_WRITE, DEVRW_BLOCK, 0, nes_write_ram},
-	{RWF_CHN_MUTE | RWF_WRITE, DEVRW_ALL, 0, nes_set_mute_mask_teta},
-	{RWF_CHN_PAN | RWF_WRITE, DEVRW_ALL, 0, nes_set_pan_teta},
+	{RWF_CHN_MUTE | RWF_WRITE, DEVRW_ALL, 0, nes_set_mute_mask_2a03},
+	{RWF_CHN_PAN | RWF_WRITE, DEVRW_ALL, 0, nes_set_pan_2a03},
 	{0x00, 0x00, 0, NULL}
 };
-static DEV_DEF devDef_TetaNES =
+static DEV_DEF devDef_APU2A03 =
 {
-	"NES APU", "Tetanes", FCC_TETA,
+	"NES APU", "APU2A03", FCC_2A03,
 	
-	device_start_nes_teta,
-	device_stop_nes_teta,
-	device_reset_nes_teta,
-	nes_stream_update_teta,
+	device_start_nes_2a03,
+	device_stop_nes_2a03,
+	device_reset_nes_2a03,
+	nes_stream_update_2a03,
 	
-	nes_set_chip_option_teta,	// SetOptionBits
-	nes_set_mute_mask_teta,
-	nes_set_pan_teta,
+	nes_set_chip_option_2a03,	// SetOptionBits
+	nes_set_mute_mask_2a03,
+	nes_set_pan_2a03,
 	NULL,	// SetSampleRateChangeCallback
 	NULL,	// SetLoggingCallback
 	NULL,	// LinkDevice
 	
-	devFunc_TetaNES,	// rwFuncs
+	devFunc_APU2A03,	// rwFuncs
 };
 #endif
 
@@ -110,8 +110,8 @@ const DEV_DECL sndDev_NES_APU =
 	DeviceChannelNames,
 	DeviceLinkIDs,
 	{	// cores
-#ifdef EC_NES_TETANES
-		&devDef_TetaNES,
+#ifdef EC_NES_APU2A03
+		&devDef_APU2A03,
 #endif
 		NULL
 	}
@@ -137,14 +137,14 @@ struct nesapu_info
 
 
 
-#ifdef EC_NES_TETANES
-static void nes_stream_update_teta(void* chip, UINT32 samples, DEV_SMPL** outputs)
+#ifdef EC_NES_APU2A03
+static void nes_stream_update_2a03(void* chip, UINT32 samples, DEV_SMPL** outputs)
 {
 	NESAPU_INF* info = (NESAPU_INF*)chip;
 	
-	nesapu_teta_update(info->chip_apu, samples, outputs);
+	nesapu_2a03_update(info->chip_apu, samples, outputs);
 	if (info->chip_fds != NULL)
-		nesfds_teta_update(info->chip_fds, samples, outputs);
+		nesfds_2a03_update(info->chip_fds, samples, outputs);
 	
 	return;
 }
@@ -153,8 +153,8 @@ static void nes_stream_update_teta(void* chip, UINT32 samples, DEV_SMPL** output
 
 
 
-#ifdef EC_NES_TETANES
-static UINT8 device_start_nes_teta(const DEV_GEN_CFG* cfg, DEV_INFO* retDevInf)
+#ifdef EC_NES_APU2A03
+static UINT8 device_start_nes_2a03(const DEV_GEN_CFG* cfg, DEV_INFO* retDevInf)
 {
 	NESAPU_INF* info;
 	UINT32 rate;
@@ -168,7 +168,7 @@ static UINT8 device_start_nes_teta(const DEV_GEN_CFG* cfg, DEV_INFO* retDevInf)
 	info = (NESAPU_INF*)calloc(1, sizeof(NESAPU_INF));
 	if (info == NULL)
 		return 0xFF;
-	info->chip_apu = nesapu_teta_create(cfg->clock, rate);
+	info->chip_apu = nesapu_2a03_create(cfg->clock, rate);
 	if (info->chip_apu == NULL)
 	{
 		free(info);
@@ -176,34 +176,34 @@ static UINT8 device_start_nes_teta(const DEV_GEN_CFG* cfg, DEV_INFO* retDevInf)
 	}
 	info->chip_dmc = NULL;
 	
-	// TetaNES has no FDS, so this core comes with its own, written from the nesdev wiki.
+	// The APU2A03 core has no FDS, so it comes with its own, written from the nesdev wiki.
 	if (cfg->flags)	// enable FDS sound
-		info->chip_fds = nesfds_teta_create(cfg->clock, rate);
+		info->chip_fds = nesfds_2a03_create(cfg->clock, rate);
 	else
 		info->chip_fds = NULL;
 	
 	info->memory = (UINT8*)malloc(0x8000);
 	memset(info->memory, 0x00, 0x8000);
-	nesapu_teta_set_memory(info->chip_apu, info->memory);
+	nesapu_2a03_set_memory(info->chip_apu, info->memory);
 	
 	info->fds_disable = 0;
 	
 	info->_devData.chipInf = info;
-	INIT_DEVINF(retDevInf, &info->_devData, rate, &devDef_TetaNES);
+	INIT_DEVINF(retDevInf, &info->_devData, rate, &devDef_APU2A03);
 	return 0x00;
 }
 #endif
 
 
 
-#ifdef EC_NES_TETANES
-static void device_stop_nes_teta(void* chip)
+#ifdef EC_NES_APU2A03
+static void device_stop_nes_2a03(void* chip)
 {
 	NESAPU_INF* info = (NESAPU_INF*)chip;
 	
-	nesapu_teta_destroy(info->chip_apu);
+	nesapu_2a03_destroy(info->chip_apu);
 	if (info->chip_fds != NULL)
-		nesfds_teta_destroy(info->chip_fds);
+		nesfds_2a03_destroy(info->chip_fds);
 	info->chip_fds = NULL;	// already freed, not NSFPlay's
 	device_stop_nes_common(info);
 	
@@ -222,14 +222,14 @@ static void device_stop_nes_common(NESAPU_INF* info)
 
 
 
-#ifdef EC_NES_TETANES
-static void device_reset_nes_teta(void* chip)
+#ifdef EC_NES_APU2A03
+static void device_reset_nes_2a03(void* chip)
 {
 	NESAPU_INF* info = (NESAPU_INF*)chip;
 	
-	nesapu_teta_reset(info->chip_apu);
+	nesapu_2a03_reset(info->chip_apu);
 	if (info->chip_fds != NULL)
-		nesfds_teta_reset(info->chip_fds);
+		nesfds_2a03_reset(info->chip_fds);
 	
 	return;
 }
@@ -238,35 +238,35 @@ static void device_reset_nes_teta(void* chip)
 
 
 
-#ifdef EC_NES_TETANES
-static void nes_w_teta(void* chip, UINT8 offset, UINT8 data)
+#ifdef EC_NES_APU2A03
+static void nes_w_2a03(void* chip, UINT8 offset, UINT8 data)
 {
 	NESAPU_INF* info = (NESAPU_INF*)chip;
 	
 	if (offset < 0x20)	// NES APU
 	{
-		nesapu_teta_write(info->chip_apu, offset, data);
+		nesapu_2a03_write(info->chip_apu, offset, data);
 	}
 	else	// FDS
 	{
 		if (info->chip_fds != NULL && ! info->fds_disable)
-			nesfds_teta_write(info->chip_fds, 0x4000 | offset, data);
+			nesfds_2a03_write(info->chip_fds, 0x4000 | offset, data);
 	}
 	return;
 }
 
-static UINT8 nes_r_teta(void* chip, UINT8 offset)
+static UINT8 nes_r_2a03(void* chip, UINT8 offset)
 {
 	NESAPU_INF* info = (NESAPU_INF*)chip;
 	
 	if (offset < 0x20)	// NES APU
 	{
-		return nesapu_teta_read(info->chip_apu, offset);
+		return nesapu_2a03_read(info->chip_apu, offset);
 	}
 	else	// FDS
 	{
 		if (info->chip_fds != NULL && ! info->fds_disable)
-			return nesfds_teta_read(info->chip_fds, 0x4000 | offset);
+			return nesfds_2a03_read(info->chip_fds, 0x4000 | offset);
 		return 0x00;
 	}
 }
@@ -316,14 +316,14 @@ static void nes_write_ram(void* chip, UINT32 offset, UINT32 length, const UINT8*
 
 
 
-#ifdef EC_NES_TETANES
-static void nes_set_chip_option_teta(void* chip, UINT32 NesOptions)
+#ifdef EC_NES_APU2A03
+static void nes_set_chip_option_2a03(void* chip, UINT32 NesOptions)
 {
 	NESAPU_INF* info = (NESAPU_INF*)chip;
 	
-	nesapu_teta_set_options(info->chip_apu, NesOptions);
+	nesapu_2a03_set_options(info->chip_apu, NesOptions);
 	if (info->chip_fds != NULL)
-		nesfds_teta_set_options(info->chip_fds, NesOptions);
+		nesfds_2a03_set_options(info->chip_fds, NesOptions);
 	info->fds_disable = (NesOptions & OPT_NES_FDS_DISABLE) ? 1 : 0;
 	
 	return;
@@ -333,25 +333,25 @@ static void nes_set_chip_option_teta(void* chip, UINT32 NesOptions)
 
 
 
-#ifdef EC_NES_TETANES
-static void nes_set_mute_mask_teta(void* chip, UINT32 MuteMask)
+#ifdef EC_NES_APU2A03
+static void nes_set_mute_mask_2a03(void* chip, UINT32 MuteMask)
 {
 	NESAPU_INF* info = (NESAPU_INF*)chip;
 	
-	nesapu_teta_set_mute_mask(info->chip_apu, MuteMask & 0x1F);
+	nesapu_2a03_set_mute_mask(info->chip_apu, MuteMask & 0x1F);
 	if (info->chip_fds != NULL)
-		nesfds_teta_set_mute(info->chip_fds, (MuteMask & 0x20) ? 1 : 0);
+		nesfds_2a03_set_mute(info->chip_fds, (MuteMask & 0x20) ? 1 : 0);
 	
 	return;
 }
 
-static void nes_set_pan_teta(void* chip, const INT16* PanVals)
+static void nes_set_pan_2a03(void* chip, const INT16* PanVals)
 {
 	NESAPU_INF* info = (NESAPU_INF*)chip;
 	
-	nesapu_teta_set_panning(info->chip_apu, PanVals);
+	nesapu_2a03_set_panning(info->chip_apu, PanVals);
 	if (info->chip_fds != NULL)
-		nesfds_teta_set_panning(info->chip_fds, PanVals[5]);
+		nesfds_2a03_set_panning(info->chip_fds, PanVals[5]);
 	
 	return;
 }

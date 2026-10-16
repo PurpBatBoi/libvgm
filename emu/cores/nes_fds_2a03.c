@@ -29,8 +29,8 @@
 #include "../EmuStructs.h"
 #include "../panning.h"
 #include "nesintf.h"
-#include "nes_fds_teta.h"
-#include "nes_synth_teta.h"
+#include "nes_fds_2a03.h"
+#include "nes_synth_2a03.h"
 
 /* At most this many CPU cycles are rendered as one synth block. */
 #define CYCLE_SIZE	10000
@@ -50,7 +50,7 @@ typedef struct
 	INT32 timer;	/* CPU cycles until the next tick */
 } FDS_ENVELOPE;
 
-typedef struct nesfds_teta
+typedef struct nesfds_2a03
 {
 	UINT32 clock_rate;
 	UINT32 sample_rate;
@@ -95,7 +95,7 @@ typedef struct nesfds_teta
 	LOW_PASS low_pass_2k;
 	FILTER_CHAIN filter;
 	float* block;
-} NESFDS_TETA;
+} NESFDS_2A03;
 
 /* "Master volume (0: full; 1: 2/3; 2: 2/4; 3: 2/5)" */
 static const float MASTER_VOLUME[4] = {1.0f, 2.0f / 3.0f, 2.0f / 4.0f, 2.0f / 5.0f};
@@ -104,13 +104,13 @@ static const float MASTER_VOLUME[4] = {1.0f, 2.0f / 3.0f, 2.0f / 4.0f, 2.0f / 5.
 /* ---- Envelopes ---- */
 
 /* CPU cycles per envelope tick: 8 * (e + 1) * (m + 1). */
-static INT32 envelope_period(const NESFDS_TETA* fds, const FDS_ENVELOPE* e)
+static INT32 envelope_period(const NESFDS_2A03* fds, const FDS_ENVELOPE* e)
 {
 	return 8 * ((INT32)e->speed + 1) * ((INT32)fds->env_speed + 1);
 }
 
 /* $4080/$4084 */
-static void envelope_write(NESFDS_TETA* fds, FDS_ENVELOPE* e, UINT8 val)
+static void envelope_write(NESFDS_2A03* fds, FDS_ENVELOPE* e, UINT8 val)
 {
 	e->off = (val & 0x80) ? 1 : 0;
 	e->increase = (val & 0x40) ? 1 : 0;
@@ -121,13 +121,13 @@ static void envelope_write(NESFDS_TETA* fds, FDS_ENVELOPE* e, UINT8 val)
 	e->timer = envelope_period(fds, e);
 }
 
-static UINT8 envelope_running(const NESFDS_TETA* fds, const FDS_ENVELOPE* e)
+static UINT8 envelope_running(const NESFDS_2A03* fds, const FDS_ENVELOPE* e)
 {
 	return ! e->off && ! fds->env_halt && ! fds->wave_halt && fds->env_speed != 0;
 }
 
 /* Runs an envelope for `cycles` cycles. */
-static void envelope_run(NESFDS_TETA* fds, FDS_ENVELOPE* e, UINT32 cycles)
+static void envelope_run(NESFDS_2A03* fds, FDS_ENVELOPE* e, UINT32 cycles)
 {
 	if (! envelope_running(fds, e))
 		return;
@@ -151,7 +151,7 @@ static void envelope_run(NESFDS_TETA* fds, FDS_ENVELOPE* e, UINT32 cycles)
 
 /* ---- Wave and mod units ---- */
 
-static UINT8 wave_position(const NESFDS_TETA* fds)
+static UINT8 wave_position(const NESFDS_2A03* fds)
 {
 	return (UINT8)(fds->wave_acc >> 18);
 }
@@ -172,7 +172,7 @@ static UINT32 modulated_pitch(UINT16 pitch, INT32 counter, UINT8 gain)
 }
 
 /* Applies a mod table entry to the 7-bit signed mod counter, which wraps. */
-static void apply_mod_entry(NESFDS_TETA* fds, UINT8 entry)
+static void apply_mod_entry(NESFDS_2A03* fds, UINT8 entry)
 {
 	if (entry == MOD_RESET)
 		fds->mod_counter = 0;
@@ -180,7 +180,7 @@ static void apply_mod_entry(NESFDS_TETA* fds, UINT8 entry)
 		fds->mod_counter = ((fds->mod_counter + MOD_ADJUST[entry] + 64) & 0x7F) - 64;
 }
 
-static void mod_tick(NESFDS_TETA* fds)
+static void mod_tick(NESFDS_2A03* fds)
 {
 	UINT8 carry;
 
@@ -210,7 +210,7 @@ static void mod_tick(NESFDS_TETA* fds)
 	}
 }
 
-static void wave_tick(NESFDS_TETA* fds)
+static void wave_tick(NESFDS_2A03* fds)
 {
 	if (fds->wave_halt)
 		return;
@@ -218,14 +218,14 @@ static void wave_tick(NESFDS_TETA* fds)
 }
 
 /* Volume gain changes take effect at wave position 0, where the PWM comparator latches. */
-static void latch_volume(NESFDS_TETA* fds)
+static void latch_volume(NESFDS_2A03* fds)
 {
 	if (wave_position(fds) == 0)
 		fds->volume = fds->vol_env.gain;
 }
 
 /* The channel's output level, before filtering. */
-static float output_level(const NESFDS_TETA* fds)
+static float output_level(const NESFDS_2A03* fds)
 {
 	UINT8 value;
 	UINT8 volume;
@@ -238,7 +238,7 @@ static float output_level(const NESFDS_TETA* fds)
 	return (float)(value * volume) * MASTER_VOLUME[fds->master_volume] * fds->scale;
 }
 
-static void add_level_delta(NESFDS_TETA* fds, UINT32 cycle)
+static void add_level_delta(NESFDS_2A03* fds, UINT32 cycle)
 {
 	float level = output_level(fds);
 
@@ -250,7 +250,7 @@ static void add_level_delta(NESFDS_TETA* fds, UINT32 cycle)
 }
 
 /* Runs a block of `cycles` cycles. */
-static void fds_run(NESFDS_TETA* fds, UINT32 cycles)
+static void fds_run(NESFDS_2A03* fds, UINT32 cycles)
 {
 	/* Register writes since the last block land at its start. */
 	add_level_delta(fds, 0);
@@ -268,48 +268,48 @@ static void fds_run(NESFDS_TETA* fds, UINT32 cycles)
 }
 
 
-void* nesfds_teta_create(UINT32 clock, UINT32 rate)
+void* nesfds_2a03_create(UINT32 clock, UINT32 rate)
 {
-	NESFDS_TETA* fds;
+	NESFDS_2A03* fds;
 
 	if (clock == 0 || rate == 0 || rate > clock / 4)
 		return NULL;
-	fds = (NESFDS_TETA*)calloc(1, sizeof(NESFDS_TETA));
+	fds = (NESFDS_2A03*)calloc(1, sizeof(NESFDS_2A03));
 	if (fds == NULL)
 		return NULL;
 	fds->clock_rate = clock;
 	fds->sample_rate = rate;
 	if (! synth_init(&fds->synth, clock, rate, CYCLE_SIZE))
 	{
-		nesfds_teta_destroy(fds);
+		nesfds_2a03_destroy(fds);
 		return NULL;
 	}
 	fds->block = (float*)calloc(fds->synth.length, sizeof(float));
 	if (fds->block == NULL)
 	{
-		nesfds_teta_destroy(fds);
+		nesfds_2a03_destroy(fds);
 		return NULL;
 	}
 	/* The wiki: "roughly 2.4x the maximum volume of the APU square". A square at volume 15
-		reaches 95.52 / (8128 / 15 + 100) on the APU's mixer scale (nes_apu_teta.c). */
+		reaches 95.52 / (8128 / 15 + 100) on the APU's mixer scale (nes_apu_2a03.c). */
 	fds->scale = 2.4f * (95.52f / (8128.0f / 15.0f + 100.0f)) / (63.0f * 32.0f);
 	fds->pan[0] = fds->pan[1] = 1.0f;
-	nesfds_teta_reset(fds);
+	nesfds_2a03_reset(fds);
 	return fds;
 }
 
-void nesfds_teta_destroy(void* chip)
+void nesfds_2a03_destroy(void* chip)
 {
-	NESFDS_TETA* fds = (NESFDS_TETA*)chip;
+	NESFDS_2A03* fds = (NESFDS_2A03*)chip;
 
 	synth_free(&fds->synth);
 	free(fds->block);
 	free(fds);
 }
 
-void nesfds_teta_reset(void* chip)
+void nesfds_2a03_reset(void* chip)
 {
-	NESFDS_TETA* fds = (NESFDS_TETA*)chip;
+	NESFDS_2A03* fds = (NESFDS_2A03*)chip;
 
 	memset(fds->wave, 0, sizeof(fds->wave));
 	memset(fds->mod_table, 0, sizeof(fds->mod_table));
@@ -342,9 +342,9 @@ void nesfds_teta_reset(void* chip)
 	filter_init(&fds->filter, (float)fds->sample_rate);
 }
 
-void nesfds_teta_write(void* chip, UINT16 addr, UINT8 data)
+void nesfds_2a03_write(void* chip, UINT16 addr, UINT8 data)
 {
-	NESFDS_TETA* fds = (NESFDS_TETA*)chip;
+	NESFDS_2A03* fds = (NESFDS_2A03*)chip;
 
 	if (addr == 0x4023)
 	{
@@ -433,9 +433,9 @@ void nesfds_teta_write(void* chip, UINT16 addr, UINT8 data)
 	}
 }
 
-UINT8 nesfds_teta_read(void* chip, UINT16 addr)
+UINT8 nesfds_2a03_read(void* chip, UINT16 addr)
 {
-	NESFDS_TETA* fds = (NESFDS_TETA*)chip;
+	NESFDS_2A03* fds = (NESFDS_2A03*)chip;
 
 	/* Bits 6-7 of most reads come from open bus, which reads as 01. */
 	if (addr >= 0x4040 && addr <= 0x407F)
@@ -456,23 +456,23 @@ UINT8 nesfds_teta_read(void* chip, UINT16 addr)
 	return 0x00;
 }
 
-void nesfds_teta_set_options(void* chip, UINT32 flags)
+void nesfds_2a03_set_options(void* chip, UINT32 flags)
 {
-	NESFDS_TETA* fds = (NESFDS_TETA*)chip;
+	NESFDS_2A03* fds = (NESFDS_2A03*)chip;
 
 	fds->reset_4085 = (flags & OPT_NES_4085_RESET) ? 1 : 0;
 }
 
-void nesfds_teta_set_mute(void* chip, UINT8 mute)
+void nesfds_2a03_set_mute(void* chip, UINT8 mute)
 {
-	NESFDS_TETA* fds = (NESFDS_TETA*)chip;
+	NESFDS_2A03* fds = (NESFDS_2A03*)chip;
 
 	fds->muted = mute;
 }
 
-void nesfds_teta_set_panning(void* chip, INT16 pan)
+void nesfds_2a03_set_panning(void* chip, INT16 pan)
 {
-	NESFDS_TETA* fds = (NESFDS_TETA*)chip;
+	NESFDS_2A03* fds = (NESFDS_2A03*)chip;
 	INT32 gains[2];
 
 	Panning_Calculate(gains, pan);
@@ -480,9 +480,9 @@ void nesfds_teta_set_panning(void* chip, INT16 pan)
 	fds->pan[1] = (float)gains[1] / PANNING_NORMAL;
 }
 
-void nesfds_teta_update(void* chip, UINT32 samples, DEV_SMPL** outputs)
+void nesfds_2a03_update(void* chip, UINT32 samples, DEV_SMPL** outputs)
 {
-	NESFDS_TETA* fds = (NESFDS_TETA*)chip;
+	NESFDS_2A03* fds = (NESFDS_2A03*)chip;
 	UINT32 done = 0;
 
 	while (done < samples)
