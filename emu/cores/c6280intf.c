@@ -9,6 +9,9 @@
 #ifdef EC_C6280_OOTAKE
 #include "Ootake_PSG.h"
 #endif
+#ifdef EC_C6280_HUCA
+#include "huc6280a.h"
+#endif
 
 
 static const char* DeviceName(const DEV_GEN_CFG* devCfg)
@@ -44,6 +47,9 @@ const DEV_DECL sndDev_C6280 =
 #endif
 #ifdef EC_C6280_MAME
 		&devDef_C6280_MAME,
+#endif
+#ifdef EC_C6280_HUCA
+		&devDef_C6280_HUCA,
 #endif
 		NULL
 	}

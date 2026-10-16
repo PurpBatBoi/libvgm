@@ -19,5 +19,7 @@
 #define FCC_RN22	0x524E3232	// Mao757 (RN22)
 #define FCC_EITO	0x4549544F	// eito
 #define FCC_SBOY	0x53424F59	// SameBoy
+#define FCC_TETA	0x54455441	// TetaNES
+#define FCC_HUCA	0x48554341	// huc6280a
 
 #endif	// __EMUCORES_H__
