@@ -49,6 +49,7 @@
 #include <stddef.h>	// for NULL
 
 #include "../../stdtype.h"
+#include "../../libs/blep_filter/blep_filter.h"
 #include "../EmuStructs.h"
 #include "../SoundDevs.h"
 #include "../EmuCores.h"
@@ -57,6 +58,7 @@
 #include "k005289.h"
 
 #define PROM_SIZE 0x200 // 512 bytes (256 per channel)
+#define BLEP_BUFFER_SIZE 4000
 
 typedef struct _k005289_state {
     DEV_DATA _devData;
@@ -74,6 +76,8 @@ typedef struct _k005289_state {
     UINT32 clock;
     UINT32 rate;
     UINT8 mute_mask;
+    INT16 voice_level[2];
+    blip_t* blep;
 } k005289_state;
 
 static void k005289_update(void* param, UINT32 samples, DEV_SMPL** outputs);
@@ -148,7 +152,19 @@ static UINT8 device_start_k005289(const DEV_GEN_CFG* cfg, DEV_INFO* retDevInf) {
     if (!info) return 0xFF;
     
     info->clock = cfg->clock;
-    info->rate = info->clock;
+    info->rate = cfg->smplRate ? cfg->smplRate : info->clock;
+    if (info->clock == 0 || info->rate == 0)
+    {
+        free(info);
+        return 0xFF;
+    }
+    info->blep = blip_new(BLEP_BUFFER_SIZE);
+    if (info->blep == NULL)
+    {
+        free(info);
+        return 0xFF;
+    }
+    blip_set_rates(info->blep, info->clock, info->rate);
     
     memset(info->prom, 0xFF, PROM_SIZE);
     
@@ -161,46 +177,96 @@ static UINT8 device_start_k005289(const DEV_GEN_CFG* cfg, DEV_INFO* retDevInf) {
 
 // Device stop
 static void device_stop_k005289(void* chip) {
-    free(chip);
+    k005289_state* info = (k005289_state*)chip;
+    blip_delete(info->blep);
+    free(info);
 }
 
 // Device reset
 static void device_reset_k005289(void* chip) {
     k005289_state* info = (k005289_state*)chip;
     memset(info->voice, 0, sizeof(info->voice));
+    info->voice_level[0] = info->voice_level[1] = 0;
+    blip_clear(info->blep);
 }
 
-// Modified update function using internal PROM
+static INT16 k005289_voice_level(const k005289_state* info, int ch)
+{
+    UINT16 prom_addr;
+    INT8 sample;
+
+    if (info->mute_mask & (1 << ch))
+        return 0;
+    prom_addr = (ch * 0x100) | (info->voice[ch].waveform << 5) | info->voice[ch].addr;
+    sample = (INT8)(info->prom[prom_addr] - 8);
+    return (INT16)(sample * info->voice[ch].volume * 16);
+}
+
 static void k005289_update(void* param, UINT32 samples, DEV_SMPL** outputs) {
     k005289_state* info = (k005289_state*)param;
-    DEV_SMPL* buffer = outputs[0];
-    DEV_SMPL* buffer2 = outputs[1];
-    UINT32 i;
-    
-    for (i = 0; i < samples; i++) {
-        INT32 mix = 0;
+    short pcm[BLEP_BUFFER_SIZE];
+    UINT32 done = 0;
+
+    while (done < samples)
+    {
+        UINT32 count = (samples - done < BLEP_BUFFER_SIZE) ? samples - done : BLEP_BUFFER_SIZE;
+        UINT32 clocks = (UINT32)blip_clocks_needed(info->blep, (int)count);
+        UINT32 position = 0;
+        INT32 delta = 0;
+        UINT32 i;
         int ch;
-        
-        for (ch = 0; ch < 2; ch++) {
-            UINT16 prom_addr;
-            INT8 sample;
-            
-            if (info->mute_mask & (1 << ch)) continue;
-            
-            if (--info->voice[ch].counter < 0) {
-                info->voice[ch].addr = (info->voice[ch].addr + 1) & 0x1F;
-                info->voice[ch].counter = info->voice[ch].freq;
-            }
-            
-            prom_addr = (ch * 0x100) |
-                        (info->voice[ch].waveform << 5) | 
-                        info->voice[ch].addr;
-            sample = info->prom[prom_addr] - 8; // Convert to signed
-            mix += sample * info->voice[ch].volume;
+
+        /* Register and mute changes between updates take effect at the frame boundary. */
+        for (ch = 0; ch < 2; ch++)
+        {
+            INT16 level = k005289_voice_level(info, ch);
+            delta += level - info->voice_level[ch];
+            info->voice_level[ch] = level;
         }
-        
-        buffer[i] = mix * 16; // Scale to 16-bit
-        buffer2[i] = buffer[i]; // Mono output
+        if (delta != 0)
+            blip_add_delta(info->blep, 0, delta);
+
+        while (position < clocks)
+        {
+            UINT32 step = clocks - position;
+
+            for (ch = 0; ch < 2; ch++)
+            {
+                UINT32 until_step;
+                if (info->mute_mask & (1 << ch))
+                    continue;
+                until_step = (UINT32)info->voice[ch].counter + 1;
+                if (until_step < step)
+                    step = until_step;
+            }
+            position += step;
+            delta = 0;
+            for (ch = 0; ch < 2; ch++)
+            {
+                if (info->mute_mask & (1 << ch))
+                    continue;
+                info->voice[ch].counter = (INT16)(info->voice[ch].counter - step);
+                if (info->voice[ch].counter < 0)
+                {
+                    INT16 old_level = info->voice_level[ch];
+                    info->voice[ch].addr = (info->voice[ch].addr + 1) & 0x1F;
+                    info->voice[ch].counter = info->voice[ch].freq;
+                    info->voice_level[ch] = k005289_voice_level(info, ch);
+                    delta += info->voice_level[ch] - old_level;
+                }
+            }
+            if (delta != 0)
+                blip_add_delta(info->blep, position, delta);
+        }
+
+        blip_end_frame(info->blep, clocks);
+        blip_read_samples(info->blep, pcm, (int)count, 0);
+        for (i = 0; i < count; i++)
+        {
+            outputs[0][done + i] = pcm[i];
+            outputs[1][done + i] = pcm[i];
+        }
+        done += count;
     }
 }
 
