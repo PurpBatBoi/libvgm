@@ -160,6 +160,11 @@ public:
 	virtual UINT32 Render(UINT32 smplCnt, WAVE_32BS* data) = 0;
 	
 protected:
+	// Asks the host for an external file through the file request callback. Returns false if it gives none.
+	bool RequestFile(const char* fileName, std::vector<UINT8>& data);
+	// Replaces a YM2608's built-in rhythm sounds with ym2608_adpcm_rom.bin, if the host provides it.
+	void LoadYM2608RhythmROM(const DEV_INFO* devInf);
+	
 	UINT32 _outSmplRate;
 	const DEV_DECL** _userDevList;
 	UINT8 _devStartOpts;

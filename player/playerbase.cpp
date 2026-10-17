@@ -3,6 +3,9 @@
 #include <stdlib.h>
 #include <string.h>	// for memset()
 
+#include "../emu/SoundEmu.h"	// for SndEmu_GetDeviceFunc()
+#include "../emu/EmuCores.h"
+
 PlayerBase::PlayerBase() :
 	_outSmplRate(0),
 	_userDevList(NULL),
@@ -18,6 +21,41 @@ PlayerBase::PlayerBase() :
 
 PlayerBase::~PlayerBase()
 {
+}
+
+bool PlayerBase::RequestFile(const char* fileName, std::vector<UINT8>& data)
+{
+	DATA_LOADER* dLoad;
+	UINT32 size;
+	const UINT8* ptr;
+	
+	data.clear();
+	if (_fileReqCbFunc == NULL)
+		return false;
+	dLoad = _fileReqCbFunc(_fileReqCbParam, this, fileName);
+	if (dLoad == NULL)
+		return false;
+	DataLoader_ReadAll(dLoad);
+	size = DataLoader_GetSize(dLoad);
+	ptr = DataLoader_GetData(dLoad);
+	if (size > 0 && ptr != NULL)
+		data.assign(ptr, ptr + size);
+	DataLoader_Deinit(dLoad);
+	return ! data.empty();
+}
+
+void PlayerBase::LoadYM2608RhythmROM(const DEV_INFO* devInf)
+{
+	DEVFUNC_WRITE_BLOCK romWrite = NULL;
+	std::vector<UINT8> rom;
+	
+	// 0x524F = 'RO': the rhythm ROM; cores without it keep their own sounds
+	if (SndEmu_GetDeviceFunc(devInf->devDef, RWF_MEMORY | RWF_WRITE, DEVRW_BLOCK, 0x524F, (void**)&romWrite))
+		return;
+	if (! RequestFile("ym2608_adpcm_rom.bin", rom))
+		return;
+	romWrite(devInf->dataPtr, 0x00, (UINT32)rom.size(), &rom[0]);
+	return;
 }
 
 UINT32 PlayerBase::GetPlayerType(void) const

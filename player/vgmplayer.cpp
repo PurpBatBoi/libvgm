@@ -1637,6 +1637,8 @@ void VGMPlayer::InitDevices(void)
 			SndEmu_GetDeviceFunc(devInf->devDef, RWF_REGISTER | RWF_WRITE, DEVRW_A16D8, 0, (void**)&chipDev.writeM8);
 			SndEmu_GetDeviceFunc(devInf->devDef, RWF_MEMORY | RWF_WRITE, DEVRW_MEMSIZE, 0, (void**)&chipDev.romSize);
 			SndEmu_GetDeviceFunc(devInf->devDef, RWF_MEMORY | RWF_WRITE, DEVRW_BLOCK, 0, (void**)&chipDev.romWrite);
+			if (chipType == DEVID_YM2608)
+				LoadYM2608RhythmROM(devInf);
 			break;
 		}
 		if (retVal)
@@ -1930,26 +1932,7 @@ void VGMPlayer::LoadOPL4ROM(CHIP_DEVICE* chipDev)
 	emu_logf(&_logger, PLRLOG_DEBUG, "OPL4 requires external sample ROM %s.\n", romFile);
 	
 	if (_yrwRom.empty())
-	{
-		if (_fileReqCbFunc == NULL)
-		{
-			emu_logf(&_logger, PLRLOG_WARN, "No file request callback available for %s.\n", romFile);
-			return;
-		}
-		DATA_LOADER* romDLoad = _fileReqCbFunc(_fileReqCbParam, this, romFile);
-		if (romDLoad == NULL)
-		{
-			emu_logf(&_logger, PLRLOG_WARN, "Couldn't load %s.\n", romFile);
-			return;
-		}
-		DataLoader_ReadAll(romDLoad);
-		
-		UINT32 yrwSize = DataLoader_GetSize(romDLoad);
-		const UINT8* yrwData = DataLoader_GetData(romDLoad);
-		if (yrwSize > 0 && yrwData != NULL)
-			_yrwRom.assign(yrwData, yrwData + yrwSize);
-		DataLoader_Deinit(romDLoad);
-	}
+		RequestFile(romFile, _yrwRom);
 	if (_yrwRom.empty())
 	{
 		emu_logf(&_logger, PLRLOG_WARN, "Couldn't load %s.\n", romFile);

@@ -12,6 +12,9 @@
 #define SNDDEV_YM2413
 #define SNDDEV_YM2612
 #define SNDDEV_YM2151
+#define SNDDEV_YM2203
+#define SNDDEV_YM2608
+#define SNDDEV_YM2610
 #define SNDDEV_YM3812
 #define SNDDEV_YM3526
 #define SNDDEV_Y8950
@@ -61,6 +64,9 @@
 #endif
 #ifdef SNDDEV_YM2151
 #include "cores/ym2151.h"
+#endif
+#if defined(SNDDEV_YM2203) || defined(SNDDEV_YM2608) || defined(SNDDEV_YM2610)
+#include "cores/ym2608.h"
 #endif
 #if defined(SNDDEV_YM3812) || defined(SNDDEV_YM3526) || defined(SNDDEV_Y8950)
 #include "cores/ym3812.h"
@@ -177,6 +183,15 @@ const DEV_DECL* sndEmu_Devices[] = {
 #endif
 #ifdef SNDDEV_YM2151
 	&sndDev_YM2151,
+#endif
+#ifdef SNDDEV_YM2203
+	&sndDev_YM2203,
+#endif
+#ifdef SNDDEV_YM2608
+	&sndDev_YM2608,
+#endif
+#ifdef SNDDEV_YM2610
+	&sndDev_YM2610,
 #endif
 #ifdef SNDDEV_YM3812
 	&sndDev_YM3812,

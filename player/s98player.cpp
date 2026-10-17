@@ -1068,6 +1068,8 @@ UINT8 S98Player::Start(void)
 			continue;
 		}
 		SndEmu_GetDeviceFunc(cDev->base.defInf.devDef, RWF_REGISTER | RWF_WRITE, DEVRW_A8D8, 0, (void**)&cDev->write);
+		if (deviceID == DEVID_YM2608)
+			LoadYM2608RhythmROM(&cDev->base.defInf);
 		
 		cDev->logCbData.player = this;
 		cDev->logCbData.chipDevID = curDev;

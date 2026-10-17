@@ -177,8 +177,7 @@ LIBEMUOBJS = \
 	$(LIBEMUOBJ)/cores/rf5cintf.o \
 	$(LIBEMUOBJ)/cores/rf5c68.o \
 	$(LIBEMUOBJ)/cores/scd_pcm.o \
-	$(LIBEMUOBJ)/cores/opnintf.o \
-	$(LIBEMUOBJ)/cores/fmopn.o \
+	$(LIBEMUOBJ)/cores/ym2608.o \
 	$(LIBEMUOBJ)/cores/ymdeltat.o \
 	$(LIBEMUOBJ)/cores/oplintf.o \
 	$(LIBEMUOBJ)/cores/fmopl.o \
