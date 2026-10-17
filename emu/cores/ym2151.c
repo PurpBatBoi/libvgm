@@ -1467,6 +1467,8 @@ static void engine_init(YM2151_STATE* chip)
 static void ym2151_generate(YM2151_STATE* chip, DEV_SMPL* outL, DEV_SMPL* outR)
 {
 	INT32 output[2];
+	INT32 temp[2];
+	UINT8 chan;
 	UINT8 tnum;
 
 	// expire timers that run out on this sample
@@ -1479,9 +1481,18 @@ static void ym2151_generate(YM2151_STATE* chip, DEV_SMPL* outL, DEV_SMPL* outR)
 	// clock the system
 	engine_clock(chip);
 
-	// update the FM content; OPM is full 14-bit with no intermediate clipping
+	// update the FM content; OPM is full 14-bit with no intermediate clipping;
+	// muted channels are still computed so their feedback state stays live
 	output[0] = output[1] = 0;
-	engine_output(chip, output, 0, 32767, ALL_CHANNELS & ~chip->muteMask);
+	for (chan = 0; chan < CHANNELS; chan ++)
+	{
+		temp[0] = temp[1] = 0;
+		engine_output(chip, temp, 0, 32767, 1 << chan);
+		if ((chip->muteMask >> chan) & 0x01)
+			continue;
+		output[0] += temp[0];
+		output[1] += temp[1];
+	}
 
 	// YM2151 uses an external DAC (YM3012) with mantissa/exponent format
 	// convert to 10.3 floating point value and back to simulate truncation

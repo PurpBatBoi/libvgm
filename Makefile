@@ -173,6 +173,7 @@ LIBEMUOBJS = \
 	$(LIBEMUOBJ)/cores/ym2612_ymfm.o \
 	$(LIBEMUOBJ)/cores/ym3438.o \
 	$(LIBEMUOBJ)/cores/ym2151.o \
+	$(LIBEMUOBJ)/cores/ym3812.o \
 	$(LIBEMUOBJ)/cores/segapcm.o \
 	$(LIBEMUOBJ)/cores/rf5cintf.o \
 	$(LIBEMUOBJ)/cores/rf5c68.o \
