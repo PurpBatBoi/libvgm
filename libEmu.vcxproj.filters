@@ -48,9 +48,6 @@
     <ClCompile Include="emu\cores\ym2612.c">
       <Filter>Quelldateien</Filter>
     </ClCompile>
-    <ClCompile Include="emu\cores\ym2612_ymfm.c">
-      <Filter>Quelldateien</Filter>
-    </ClCompile>
     <ClCompile Include="emu\cores\ym2151.c">
       <Filter>Quelldateien</Filter>
     </ClCompile>
@@ -231,9 +228,6 @@
       <Filter>Headerdateien</Filter>
     </ClInclude>
     <ClInclude Include="emu\cores\ym2612.h">
-      <Filter>Headerdateien</Filter>
-    </ClInclude>
-    <ClInclude Include="emu\cores\ym2612_ymfm.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
     <ClInclude Include="emu\cores\ym2151.h">

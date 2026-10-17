@@ -193,7 +193,6 @@
     </ClCompile>
     <ClCompile Include="emu\cores\segapcm.c" />
     <ClCompile Include="emu\cores\ym2612.c" />
-    <ClCompile Include="emu\cores\ym2612_ymfm.c" />
     <ClCompile Include="emu\cores\ym2151.c" />
     <ClCompile Include="emu\cores\ym3812.c" />
     <ClCompile Include="emu\cores\ymf262.c" />
@@ -213,7 +212,6 @@
   <ItemGroup>
     <ClInclude Include="emu\cores\2413intf.h" />
     <ClInclude Include="emu\cores\ym2612.h" />
-    <ClInclude Include="emu\cores\ym2612_ymfm.h" />
     <ClInclude Include="emu\cores\ym2151.h" />
     <ClInclude Include="emu\cores\ym3812.h" />
     <ClInclude Include="emu\cores\ymf262.h" />
