@@ -1755,11 +1755,6 @@ void VGMPlayer::InitDevices(void)
 		// set emulation core of linked device (OPN(A) SSG / OPL4 FM)
 		dLink->cfg->emuCore = devOpts->emuCore[1];
 	}
-	else
-	{
-		if (dLink->devID == DEVID_YMF262)
-			dLink->cfg->emuCore = FCC_ADLE;
-	}
 	
 	if (dLink->devID == DEVID_AY8910)
 	{

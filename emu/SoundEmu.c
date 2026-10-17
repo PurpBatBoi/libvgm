@@ -19,6 +19,7 @@
 #define SNDDEV_YM3526
 #define SNDDEV_Y8950
 #define SNDDEV_YMF262
+#define SNDDEV_YMF278B
 #define SNDDEV_SEGAPCM
 #define SNDDEV_RF5C68
 #define SNDDEV_YMZ280B
@@ -73,6 +74,9 @@
 #endif
 #ifdef SNDDEV_YMF262
 #include "cores/ymf262.h"
+#endif
+#ifdef SNDDEV_YMF278B
+#include "cores/ymf278b.h"
 #endif
 #ifdef SNDDEV_SEGAPCM
 #include "cores/segapcm.h"
@@ -204,6 +208,9 @@ const DEV_DECL* sndEmu_Devices[] = {
 #endif
 #ifdef SNDDEV_YMF262
 	&sndDev_YMF262,
+#endif
+#ifdef SNDDEV_YMF278B
+	&sndDev_YMF278B,
 #endif
 #ifdef SNDDEV_SEGAPCM
 	&sndDev_SegaPCM,

@@ -47,6 +47,12 @@
     - One update sample is one chip sample (clock / 288). The 4 outputs are
       mixed to stereo like libvgm's MAME core: left = A + C, right = B + D.
       Each output is clamped to 16 bits first, as ymfm does.
+    - YMF262_FLAG_OPL4 (cfg.flags bit 0) is for the FM part of a YMF278B,
+      which ymf278b.c links to this core with clock * 8 / 19 (the OPL4 FM
+      engine clocks every 19 * 36 cycles instead of 8 * 36). The OPL4 mixes
+      only outputs A and B into its stereo pin, so left = A and right = B.
+    - The volume function scales the stereo output by n / 0x10000 (the OPL4
+      FM mix level). It has a 11-bit resolution.
     - Change from ymfm: ymfm samples the key state once per sample, so a
       key off followed by a key on before the next sample was lost and the
       note did not restart. Sound drivers commonly write them back to back.
@@ -75,12 +81,14 @@ static void device_reset_ymf262(void* info);
 static void ymf262_w(void* info, UINT8 offset, UINT8 data);
 static UINT8 ymf262_r(void* info, UINT8 offset);
 static void ymf262_set_mute_mask(void* info, UINT32 MuteMask);
+static void ymf262_set_vol_lr(void* info, INT32 volL, INT32 volR);
 
 
 static DEVDEF_RWFUNC devFunc262[] =
 {
 	{RWF_REGISTER | RWF_WRITE, DEVRW_A8D8, 0, ymf262_w},
 	{RWF_REGISTER | RWF_READ, DEVRW_A8D8, 0, ymf262_r},
+	{RWF_VOLUME_LR | RWF_WRITE, DEVRW_VALUE, 0, ymf262_set_vol_lr},
 	{RWF_CHN_MUTE | RWF_WRITE, DEVRW_ALL, 0, ymf262_set_mute_mask},
 	{0x00, 0x00, 0, NULL}
 };
@@ -178,6 +186,9 @@ const DEV_DECL sndDev_YMF262 =
 // "quiet" value, used to optimize when we can skip doing work
 #define EG_QUIET	0x380
 
+// output scale of 100%, see ymf262_set_vol_lr()
+#define VOL_UNITY	0x800
+
 // key on sources; actual keyon is an OR over all of these
 #define KEYON_NORMAL	0
 #define KEYON_RHYTHM	1
@@ -248,6 +259,8 @@ typedef struct _ymf262_state
 	UINT16 address;			// address register
 
 	UINT32 muteMask;
+	UINT8 opl4;				// non-zero if this is the FM part of a YMF278B
+	INT32 vol[2];			// output scale for left/right, 0x800 = 100%
 } YMF262_STATE;
 
 
@@ -1565,8 +1578,20 @@ static void ymf262_generate(YMF262_STATE* chip, DEV_SMPL* outL, DEV_SMPL* outR)
 	for (outnum = 0; outnum < OUTPUTS; outnum ++)
 		output[outnum] = clamp(output[outnum], -32768, 32767);
 
-	*outL = output[0] + output[2];
-	*outR = output[1] + output[3];
+	if (chip->opl4)
+	{
+		*outL = output[0];
+		*outR = output[1];
+	}
+	else
+	{
+		*outL = output[0] + output[2];
+		*outR = output[1] + output[3];
+	}
+	if (chip->vol[0] != VOL_UNITY)
+		*outL = (*outL * chip->vol[0]) >> 11;
+	if (chip->vol[1] != VOL_UNITY)
+		*outR = (*outR * chip->vol[1]) >> 11;
 	return;
 }
 
@@ -1586,6 +1611,8 @@ static UINT8 device_start_ymf262(const DEV_GEN_CFG* cfg, DEV_INFO* retDevInf)
 	engine_init(chip);
 	engine_reset(chip);
 	chip->muteMask = 0x00;
+	chip->opl4 = (cfg->flags & YMF262_FLAG_OPL4) ? 1 : 0;
+	chip->vol[0] = chip->vol[1] = VOL_UNITY;
 
 	chip->_devData.chipInf = chip;
 	INIT_DEVINF(retDevInf, &chip->_devData, cfg->clock / 288, &devDef262);
@@ -1660,5 +1687,15 @@ static void ymf262_set_mute_mask(void* info, UINT32 MuteMask)
 	YMF262_STATE* chip = (YMF262_STATE*)info;
 
 	chip->muteMask = MuteMask;
+	return;
+}
+
+// volume of the stereo output, 0x10000 = 100%
+static void ymf262_set_vol_lr(void* info, INT32 volL, INT32 volR)
+{
+	YMF262_STATE* chip = (YMF262_STATE*)info;
+
+	chip->vol[0] = volL >> 5;
+	chip->vol[1] = volR >> 5;
 	return;
 }

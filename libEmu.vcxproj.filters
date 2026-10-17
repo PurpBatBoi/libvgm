@@ -60,6 +60,9 @@
     <ClCompile Include="emu\cores\ymf262.c">
       <Filter>Quelldateien</Filter>
     </ClCompile>
+    <ClCompile Include="emu\cores\ymf278b.c">
+      <Filter>Quelldateien</Filter>
+    </ClCompile>
     <ClCompile Include="emu\cores\rf5c68.c">
       <Filter>Quelldateien</Filter>
     </ClCompile>
@@ -246,6 +249,9 @@
       <Filter>Headerdateien</Filter>
     </ClInclude>
     <ClInclude Include="emu\cores\ymf262.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
+    <ClInclude Include="emu\cores\ymf278b.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
     <ClInclude Include="emu\cores\segapcm.h">
