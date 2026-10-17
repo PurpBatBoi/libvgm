@@ -130,6 +130,7 @@ option(BUILD_LIBPLAYER "build player library" ON)
 option(BUILD_TESTS "build test programs" OFF)
 option(BUILD_PLAYER "build player application" ON)
 option(BUILD_VGM2WAV "build sample vgm2wav application" ON)
+option(BUILD_YM2608ROM "build the YM2608 rhythm ROM tool" ON)
 set(LIBRARY_TYPE "STATIC" CACHE STRING "library build type (static/shared)")
 set_property(CACHE LIBRARY_TYPE PROPERTY STRINGS "SHARED;STATIC")
 option(REALLY_NEED_CXX14 "I really need C++14" OFF)
@@ -219,6 +220,11 @@ if(USE_SANITIZERS)
 endif(USE_SANITIZERS)
 install(TARGETS vgm2wav DESTINATION "${CMAKE_INSTALL_BINDIR}")
 endif(BUILD_VGM2WAV)
+
+if(BUILD_YM2608ROM)
+add_executable(ym2608rom utils/ym2608rom/ym2608rom.c)
+install(TARGETS ym2608rom DESTINATION "${CMAKE_INSTALL_BINDIR}")
+endif(BUILD_YM2608ROM)
 
 set(COMMON_HEADERS
 	common_def.h
