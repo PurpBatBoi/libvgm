@@ -24,7 +24,6 @@ extern "C"
 
 
 // FourCC for ymfm cores
-#define FCC_YMFM	0x594D464D	// "YMFM"
 
 
 //*********************************************************

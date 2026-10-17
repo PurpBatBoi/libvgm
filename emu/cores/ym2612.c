@@ -42,6 +42,7 @@
 #include "../EmuHelper.h"
 
 #include "ym2612.h"
+#include "ym2612_ymfm.h"
 
 #ifndef M_PI
 #define M_PI	3.14159265358979323846
@@ -119,7 +120,8 @@ const DEV_DECL sndDev_YM2612 =
 	DeviceChannelNames,
 	DeviceLinkIDs,
 	{	// cores
-		&devDef,
+		&devDef,	// default
+		&devDef_YM2612_YMFM,
 		NULL
 	}
 };
