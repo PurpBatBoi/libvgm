@@ -47,6 +47,11 @@
     - The busy flag is not emulated. The CT1/CT2 output lines (register
       0x1B bits 6-7) are stored but drive nothing.
     - The YM2164 (OPP) variant is not included.
+    - Change from ymfm: ymfm samples the key state once per sample, so a
+      key off followed by a key on before the next sample was lost and the
+      note did not restart. Sound drivers commonly write them back to back.
+      Here a key off is remembered until the next sample, so the operator
+      releases and then attacks again, as on the real chip.
 
 ***************************************************************************/
 
@@ -185,6 +190,7 @@ typedef struct _fm_operator
 	UINT8 env_state;		// current envelope state
 	UINT8 key_state;		// current key state: on or off (bit 0)
 	UINT8 keyon_live;		// live key on state (bit 0 = direct, bit 2 = CSM)
+	UINT8 keyoff_pending;	// the live key went off since the last prepare
 	OPDATA_CACHE cache;		// cached values for performance
 } FM_OPERATOR;
 
@@ -891,6 +897,7 @@ static void op_reset(FM_OPERATOR* op)
 	op->env_state = EG_RELEASE;
 	op->key_state = 0;
 	op->keyon_live = 0;
+	op->keyoff_pending = 0;
 	return;
 }
 
@@ -945,7 +952,13 @@ static UINT8 op_prepare(const YM2151_STATE* chip, FM_OPERATOR* op)
 	// cache the data
 	cache_operator_data(chip, op->choffs, op->opoffs, &op->cache);
 
-	// clock the key state
+	// clock the key state; a key off since the last prepare releases first,
+	// so a key off + key on within one sample restarts the note
+	if (op->keyoff_pending)
+	{
+		op_clock_keystate(op, 0);
+		op->keyoff_pending = 0;
+	}
 	op_clock_keystate(op, (UINT32)(op->keyon_live != 0));
 	op->keyon_live &= ~(1 << KEYON_CSM);
 
@@ -1103,11 +1116,15 @@ static INT32 op_compute_noise_volume(const YM2151_STATE* chip, const FM_OPERATOR
 static void channel_keyonoff(YM2151_STATE* chip, FM_CHANNEL* ch, UINT32 states, UINT8 type)
 {
 	UINT8 opnum;
+	UINT8 old_live;
 
 	for (opnum = 0; opnum < 4; opnum ++)
 	{
 		FM_OPERATOR* op = &chip->op[ch->op[opnum]];
+		old_live = op->keyon_live;
 		op->keyon_live = (UINT8)((op->keyon_live & ~(1 << type)) | (bitfield(states, opnum, 1) << type));
+		if (old_live != 0 && op->keyon_live == 0)
+			op->keyoff_pending = 1;
 	}
 	return;
 }

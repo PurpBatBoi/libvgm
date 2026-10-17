@@ -47,6 +47,11 @@
     - One update sample is one chip sample (clock / 288). The 4 outputs are
       mixed to stereo like libvgm's MAME core: left = A + C, right = B + D.
       Each output is clamped to 16 bits first, as ymfm does.
+    - Change from ymfm: ymfm samples the key state once per sample, so a
+      key off followed by a key on before the next sample was lost and the
+      note did not restart. Sound drivers commonly write them back to back.
+      Here a key off is remembered until the next sample, so the operator
+      releases and then attacks again, as on the real chip.
 
 ***************************************************************************/
 
@@ -204,6 +209,7 @@ typedef struct _fm_operator
 	UINT8 key_state;		// current key state: on or off (bit 0)
 	UINT8 keyon_live;		// live key on state (bit 0 = direct, bit 1 = rhythm)
 	OPDATA_CACHE cache;		// cached values for performance
+	UINT8 keyoff_pending;	// the live key went off since the last prepare
 } FM_OPERATOR;
 
 typedef struct _fm_channel
@@ -666,13 +672,18 @@ static void op_reset(FM_OPERATOR* op)
 	op->env_state = EG_RELEASE;
 	op->key_state = 0;
 	op->keyon_live = 0;
+	op->keyoff_pending = 0;
 	return;
 }
 
 // signal key on/off from one source
 static void op_keyonoff(FM_OPERATOR* op, UINT32 on, UINT8 type)
 {
+	UINT8 old_live = op->keyon_live;
+
 	op->keyon_live = (UINT8)((op->keyon_live & ~(1 << type)) | (bitfield(on, 0, 1) << type));
+	if (old_live != 0 && op->keyon_live == 0)
+		op->keyoff_pending = 1;
 	return;
 }
 
@@ -727,7 +738,13 @@ static UINT8 op_prepare(const YMF262_STATE* chip, FM_OPERATOR* op)
 	// cache the data
 	cache_operator_data(chip, op->choffs, op->opoffs, &op->cache);
 
-	// clock the key state
+	// clock the key state; a key off since the last prepare releases first,
+	// so a key off + key on within one sample restarts the note
+	if (op->keyoff_pending)
+	{
+		op_clock_keystate(op, 0);
+		op->keyoff_pending = 0;
+	}
 	op_clock_keystate(op, (UINT32)(op->keyon_live != 0));
 
 	// we're active until we're quiet after the release
