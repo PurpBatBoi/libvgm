@@ -78,6 +78,9 @@
     <ClCompile Include="emu\cores\ares_32xpwm.c">
       <Filter>Quelldateien</Filter>
     </ClCompile>
+    <ClCompile Include="emu\cores\ares_wswan.c">
+      <Filter>Quelldateien</Filter>
+    </ClCompile>
     <ClCompile Include="emu\cores\ay8910.c">
       <Filter>Quelldateien</Filter>
     </ClCompile>
@@ -276,6 +279,9 @@
       <Filter>Headerdateien</Filter>
     </ClInclude>
     <ClInclude Include="emu\cores\ares_32xpwm.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
+    <ClInclude Include="emu\cores\ares_wswan.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
     <ClInclude Include="emu\cores\ay8910.h">

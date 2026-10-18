@@ -217,7 +217,7 @@ LIBEMUOBJS = \
 	$(LIBEMUOBJ)/cores/qsound_ctr.o \
 	$(LIBEMUOBJ)/cores/scsp.o \
 	$(LIBEMUOBJ)/cores/scspdsp.o \
-	$(LIBEMUOBJ)/cores/ws_audio.o \
+	$(LIBEMUOBJ)/cores/ares_wswan.o \
 	$(LIBEMUOBJ)/cores/vsu.o \
 	$(LIBEMUOBJ)/cores/saaintf.o \
 	$(LIBEMUOBJ)/cores/saa1099_mame.o \

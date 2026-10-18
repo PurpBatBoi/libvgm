@@ -41,6 +41,7 @@
 #define SNDDEV_POKEY
 #define SNDDEV_QSOUND
 #define SNDDEV_SCSP
+#define SNDDEV_WSWAN
 #define SNDDEV_SAA1099
 #define SNDDEV_ES5503
 #define SNDDEV_X1_010
@@ -132,6 +133,9 @@
 #endif
 #ifdef SNDDEV_SCSP
 #include "cores/scsp.h"
+#endif
+#ifdef SNDDEV_WSWAN
+#include "cores/ares_wswan.h"
 #endif
 #ifdef SNDDEV_SAA1099
 #include "cores/saaintf.h"
@@ -269,6 +273,9 @@ const DEV_DECL* sndEmu_Devices[] = {
 #endif
 #ifdef SNDDEV_SCSP
 	&sndDev_SCSP,
+#endif
+#ifdef SNDDEV_WSWAN
+	&sndDev_WSwan,
 #endif
 #ifdef SNDDEV_SAA1099
 	&sndDev_SAA1099,
