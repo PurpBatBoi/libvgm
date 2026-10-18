@@ -24,6 +24,7 @@
 #define SNDDEV_RF5C68
 #define SNDDEV_YMZ280B
 #define SNDDEV_YMF271
+#define SNDDEV_32X_PWM
 #define SNDDEV_AY8910
 #define SNDDEV_GAMEBOY
 #define SNDDEV_NES_APU
@@ -80,6 +81,9 @@
 #endif
 #ifdef SNDDEV_YMZ280B
 #include "cores/ymz280b.h"
+#endif
+#ifdef SNDDEV_32X_PWM
+#include "cores/ares_32xpwm.h"
 #endif
 #ifdef SNDDEV_AY8910
 #include "cores/ayintf.h"
@@ -214,6 +218,9 @@ const DEV_DECL* sndEmu_Devices[] = {
 #endif
 #ifdef SNDDEV_YMZ280B
 	&sndDev_YMZ280B,
+#endif
+#ifdef SNDDEV_32X_PWM
+	&sndDev_32X_PWM,
 #endif
 #ifdef SNDDEV_AY8910
 	&sndDev_AY8910,

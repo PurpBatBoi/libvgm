@@ -191,7 +191,7 @@ LIBEMUOBJS = \
 	$(LIBEMUOBJ)/cores/ymz280b.o \
 	$(LIBEMUOBJ)/cores/ayintf.o \
 	$(LIBEMUOBJ)/cores/ay8910.o \
-	$(LIBEMUOBJ)/cores/pwm.o \
+	$(LIBEMUOBJ)/cores/ares_32xpwm.o \
 	$(LIBEMUOBJ)/cores/gb.o \
 	$(LIBEMUOBJ)/cores/nesintf.o \
 	$(LIBEMUOBJ)/cores/nes_apu.o \

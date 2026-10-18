@@ -20,5 +20,6 @@
 #define FCC_EITO	0x4549544F	// eito
 #define FCC_2A03	0x32413033	// APU2A03
 #define FCC_YMFM	0x594D464D	// ymfm
+#define FCC_ARES	0x41524553	// ares
 
 #endif	// __EMUCORES_H__

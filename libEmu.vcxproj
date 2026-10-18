@@ -151,6 +151,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="emu\cores\2413intf.c" />
+    <ClCompile Include="emu\cores\ares_32xpwm.c" />
     <ClCompile Include="emu\cores\ay8910.c" />
     <ClCompile Include="emu\cores\ayintf.c" />
     <ClCompile Include="emu\cores\bsmt2000.c" />
@@ -221,6 +222,7 @@
     <ClInclude Include="emu\cores\ymfm_opn_rhythm.h" />
     <ClInclude Include="emu\cores\ymfm_opm.h" />
     <ClInclude Include="emu\cores\ymfm_opl.h" />
+    <ClInclude Include="emu\cores\ares_32xpwm.h" />
     <ClInclude Include="emu\cores\ay8910.h" />
     <ClInclude Include="emu\cores\ayintf.h" />
     <ClInclude Include="emu\cores\bsmt2000.h" />
