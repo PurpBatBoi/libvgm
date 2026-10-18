@@ -1,7 +1,7 @@
 # YM2608 rhythm ROM tool
 
 The YM2608 (OPNA) plays its six rhythm sounds from an 8 KB ROM inside the chip. libvgm's YM2608 core ships with a
-free replacement ROM (the Tetorica OPNA rhythm sounds, see `../../emu/cores/ym2608_rhythm.h`), and a player can
+free replacement ROM (the Tetorica OPNA rhythm sounds, see `../../emu/cores/ymfm_opn_rhythm.h`), and a player can
 load another one (it asks for `ym2608_adpcm_rom.bin`).
 
 `ym2608rom` turns a rhythm ROM into six `.wav` files and back, so you can make your own drum set in any sample

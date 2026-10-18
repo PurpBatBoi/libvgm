@@ -18,7 +18,7 @@
 #endif
 
 #include "../../stdtype.h"
-#include "../../emu/cores/ym2608_rhythm.h"	// the built-in rhythm sounds (YM2608_RHYTHM_ROM_SIZE)
+#include "../../emu/cores/ymfm_opn_rhythm.h"	// the built-in rhythm sounds (YM2608_RHYTHM_ROM_SIZE)
 
 typedef struct _rhythm_voice
 {

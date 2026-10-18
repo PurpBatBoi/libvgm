@@ -60,23 +60,14 @@
 #ifdef SNDDEV_YM2413
 #include "cores/2413intf.h"
 #endif
-#ifdef SNDDEV_YM2612
-#include "cores/ym2612.h"
+#if defined(SNDDEV_YM2612) || defined(SNDDEV_YM2203) || defined(SNDDEV_YM2608) || defined(SNDDEV_YM2610)
+#include "cores/ymfm_opn.h"
 #endif
 #ifdef SNDDEV_YM2151
-#include "cores/ym2151.h"
+#include "cores/ymfm_opm.h"
 #endif
-#if defined(SNDDEV_YM2203) || defined(SNDDEV_YM2608) || defined(SNDDEV_YM2610)
-#include "cores/ym2608.h"
-#endif
-#if defined(SNDDEV_YM3812) || defined(SNDDEV_YM3526) || defined(SNDDEV_Y8950)
-#include "cores/ym3812.h"
-#endif
-#ifdef SNDDEV_YMF262
-#include "cores/ymf262.h"
-#endif
-#ifdef SNDDEV_YMF278B
-#include "cores/ymf278b.h"
+#if defined(SNDDEV_YM3812) || defined(SNDDEV_YM3526) || defined(SNDDEV_Y8950) || defined(SNDDEV_YMF262) || defined(SNDDEV_YMF278B)
+#include "cores/ymfm_opl.h"
 #endif
 #ifdef SNDDEV_SEGAPCM
 #include "cores/segapcm.h"

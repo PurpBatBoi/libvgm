@@ -49,8 +49,8 @@
 
 ***************************************************************************/
 
-#ifndef __YM2608_RHYTHM_H__
-#define __YM2608_RHYTHM_H__
+#ifndef __YMFM_OPN_RHYTHM_H__
+#define __YMFM_OPN_RHYTHM_H__
 
 #define YM2608_RHYTHM_ROM_SIZE	0x2000
 
@@ -570,4 +570,4 @@ static const UINT8 ym2608_rhythm_rom[YM2608_RHYTHM_ROM_SIZE] =
 	0x36,0x09,0x2a,0x2a,0x8e,0x00,0x11,0x09,0x01,0x98,0x80,0x80,0x08,0x08,0x08,0x08,
 };
 
-#endif	// __YM2608_RHYTHM_H__
+#endif	// __YMFM_OPN_RHYTHM_H__

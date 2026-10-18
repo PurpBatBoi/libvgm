@@ -169,24 +169,24 @@ LIBEMUOBJS = \
 	$(LIBEMUOBJ)/cores/emu2413.o \
 	$(LIBEMUOBJ)/cores/ym2413.o \
 	$(LIBEMUOBJ)/cores/nukedopll.o \
-	$(LIBEMUOBJ)/cores/ym2612.o \
+	$(LIBEMUOBJ)/cores/ymfm_fm.o \
+	$(LIBEMUOBJ)/cores/ymfm_adpcm.o \
+	$(LIBEMUOBJ)/cores/ymfm_pcm.o \
+	$(LIBEMUOBJ)/cores/ymfm_opn.o \
+	$(LIBEMUOBJ)/cores/ymfm_opm.o \
+	$(LIBEMUOBJ)/cores/ymfm_opl.o \
 	$(LIBEMUOBJ)/cores/ym3438.o \
-	$(LIBEMUOBJ)/cores/ym2151.o \
-	$(LIBEMUOBJ)/cores/ym3812.o \
 	$(LIBEMUOBJ)/cores/segapcm.o \
 	$(LIBEMUOBJ)/cores/rf5cintf.o \
 	$(LIBEMUOBJ)/cores/rf5c68.o \
 	$(LIBEMUOBJ)/cores/scd_pcm.o \
-	$(LIBEMUOBJ)/cores/ym2608.o \
 	$(LIBEMUOBJ)/cores/ymdeltat.o \
 	$(LIBEMUOBJ)/cores/oplintf.o \
 	$(LIBEMUOBJ)/cores/fmopl.o \
 	$(LIBEMUOBJ)/cores/adlibemu_opl2.o \
 	$(LIBEMUOBJ)/cores/262intf.o \
-	$(LIBEMUOBJ)/cores/ymf262.o \
 	$(LIBEMUOBJ)/cores/adlibemu_opl3.o \
 	$(LIBEMUOBJ)/cores/nukedopl3.o \
-	$(LIBEMUOBJ)/cores/ymf278b.o \
 	$(LIBEMUOBJ)/cores/ymf271.o \
 	$(LIBEMUOBJ)/cores/ymz280b.o \
 	$(LIBEMUOBJ)/cores/ayintf.o \

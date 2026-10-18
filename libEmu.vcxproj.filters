@@ -45,22 +45,22 @@
     <ClCompile Include="emu\cores\segapcm.c">
       <Filter>Quelldateien</Filter>
     </ClCompile>
-    <ClCompile Include="emu\cores\ym2612.c">
+    <ClCompile Include="emu\cores\ymfm_fm.c">
       <Filter>Quelldateien</Filter>
     </ClCompile>
-    <ClCompile Include="emu\cores\ym2151.c">
+    <ClCompile Include="emu\cores\ymfm_adpcm.c">
       <Filter>Quelldateien</Filter>
     </ClCompile>
-    <ClCompile Include="emu\cores\ym2608.c">
+    <ClCompile Include="emu\cores\ymfm_pcm.c">
       <Filter>Quelldateien</Filter>
     </ClCompile>
-    <ClCompile Include="emu\cores\ym3812.c">
+    <ClCompile Include="emu\cores\ymfm_opn.c">
       <Filter>Quelldateien</Filter>
     </ClCompile>
-    <ClCompile Include="emu\cores\ymf262.c">
+    <ClCompile Include="emu\cores\ymfm_opm.c">
       <Filter>Quelldateien</Filter>
     </ClCompile>
-    <ClCompile Include="emu\cores\ymf278b.c">
+    <ClCompile Include="emu\cores\ymfm_opl.c">
       <Filter>Quelldateien</Filter>
     </ClCompile>
     <ClCompile Include="emu\cores\rf5c68.c">
@@ -233,25 +233,28 @@
     <ClInclude Include="emu\cores\opll_vrc7tone.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
-    <ClInclude Include="emu\cores\ym2612.h">
+    <ClInclude Include="emu\cores\ymfm_fm.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
-    <ClInclude Include="emu\cores\ym2151.h">
+    <ClInclude Include="emu\cores\ymfm_fm_impl.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
-    <ClInclude Include="emu\cores\ym2608.h">
+    <ClInclude Include="emu\cores\ymfm_adpcm.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
-    <ClInclude Include="emu\cores\ym2608_rhythm.h">
+    <ClInclude Include="emu\cores\ymfm_pcm.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
-    <ClInclude Include="emu\cores\ym3812.h">
+    <ClInclude Include="emu\cores\ymfm_opn.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
-    <ClInclude Include="emu\cores\ymf262.h">
+    <ClInclude Include="emu\cores\ymfm_opn_rhythm.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
-    <ClInclude Include="emu\cores\ymf278b.h">
+    <ClInclude Include="emu\cores\ymfm_opm.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
+    <ClInclude Include="emu\cores\ymfm_opl.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
     <ClInclude Include="emu\cores\segapcm.h">

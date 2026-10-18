@@ -192,12 +192,12 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="emu\cores\segapcm.c" />
-    <ClCompile Include="emu\cores\ym2612.c" />
-    <ClCompile Include="emu\cores\ym2151.c" />
-    <ClCompile Include="emu\cores\ym2608.c" />
-    <ClCompile Include="emu\cores\ym3812.c" />
-    <ClCompile Include="emu\cores\ymf262.c" />
-    <ClCompile Include="emu\cores\ymf278b.c" />
+    <ClCompile Include="emu\cores\ymfm_fm.c" />
+    <ClCompile Include="emu\cores\ymfm_adpcm.c" />
+    <ClCompile Include="emu\cores\ymfm_pcm.c" />
+    <ClCompile Include="emu\cores\ymfm_opn.c" />
+    <ClCompile Include="emu\cores\ymfm_opm.c" />
+    <ClCompile Include="emu\cores\ymfm_opl.c" />
     <ClCompile Include="emu\cores\upd7759.c" />
     <ClCompile Include="emu\cores\x1_010.c" />
     <ClCompile Include="emu\cores\ymf271.c" />
@@ -213,13 +213,14 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="emu\cores\2413intf.h" />
-    <ClInclude Include="emu\cores\ym2612.h" />
-    <ClInclude Include="emu\cores\ym2151.h" />
-    <ClInclude Include="emu\cores\ym2608.h" />
-    <ClInclude Include="emu\cores\ym2608_rhythm.h" />
-    <ClInclude Include="emu\cores\ym3812.h" />
-    <ClInclude Include="emu\cores\ymf262.h" />
-    <ClInclude Include="emu\cores\ymf278b.h" />
+    <ClInclude Include="emu\cores\ymfm_fm.h" />
+    <ClInclude Include="emu\cores\ymfm_fm_impl.h" />
+    <ClInclude Include="emu\cores\ymfm_adpcm.h" />
+    <ClInclude Include="emu\cores\ymfm_pcm.h" />
+    <ClInclude Include="emu\cores\ymfm_opn.h" />
+    <ClInclude Include="emu\cores\ymfm_opn_rhythm.h" />
+    <ClInclude Include="emu\cores\ymfm_opm.h" />
+    <ClInclude Include="emu\cores\ymfm_opl.h" />
     <ClInclude Include="emu\cores\ay8910.h" />
     <ClInclude Include="emu\cores\ayintf.h" />
     <ClInclude Include="emu\cores\bsmt2000.h" />
