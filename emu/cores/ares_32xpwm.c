@@ -58,6 +58,12 @@
         cannot switch the PWM off with a mode 0 write.
       - reset clears the last value of the FIFOs (ares keeps it), so a
         restarted song renders the same as a fresh one.
+      - After a reset, the DC filter of each channel starts its history at
+        the first non-zero input (y = input), so that tick outputs 0. ares
+        starts the filter at rest, so the first pulse width is a step of about
+        half scale that the filter takes ~1000 periods to remove: a loud
+        thump at the start of every song. Until the first non-zero input the
+        filter state is x = y = 0 either way, so only that tick differs.
       - The device always runs at the PWM period rate. The player resamples.
       - Muting computes everything and only silences the output.
     - Float arithmetic follows the C++ types (float for the pulse ratio,
@@ -192,6 +198,8 @@ typedef struct _pwm_state
 	INT16 rsample;
 	PWM_DC_FILTER lfilter;
 	PWM_DC_FILTER rfilter;
+	UINT8 lprimed;	// the filter history was set from the first non-zero input
+	UINT8 rprimed;
 
 	UINT8 mute;
 } pwm_state;
@@ -293,6 +301,18 @@ static void pwm_update(void* info, UINT32 samples, DEV_SMPL** outputs)
 		left = (float)sampleL / (float)clocks;
 		right = (float)sampleR / (float)clocks;
 
+		// start the filter history at the first non-zero input (see the port notes)
+		if (! chip->lprimed && left != 0.0f)
+		{
+			chip->lprimed = 1;
+			chip->lfilter.y = left;
+		}
+		if (! chip->rprimed && right != 0.0f)
+		{
+			chip->rprimed = 1;
+			chip->rfilter.y = right;
+		}
+
 		// filter DC offset to normalize output and limit popping
 		left = (float)dc_filter_process(&chip->lfilter, left);
 		right = (float)dc_filter_process(&chip->rfilter, right);
@@ -325,6 +345,8 @@ static void pwm_reset(void* info)
 	chip->lfilter.y = 0.0;
 	chip->rfilter.x = 0.0;
 	chip->rfilter.y = 0.0;
+	chip->lprimed = 0;
+	chip->rprimed = 0;
 	pwm_update_rate(chip);
 }
 
