@@ -36,9 +36,10 @@
       Values are signed 12-bit, as in ares (i12).
     - The output is the float of ares (pulse width / clocks, DC filtered in
       double, clipped to -1.0 ... 1.0). It becomes a DEV_SMPL by scaling 1.0
-      to 65536 and rounding to the nearest integer. A full-range pulse swings
-      the float by +-0.5, so this gives +-32768: the level of the Gens/GS
-      core that the player's volume for this chip (0xE0) was set for.
+      to 32768 and rounding to the nearest integer. A full-range pulse swings
+      the float by +-0.5, so this gives +-16384, which is 6 dB below the
+      Gens/GS core that the player's volume for this chip (0xE0) was set for
+      (that scale, 65536, sounded too loud next to the other chips).
     - The clip x / abs(x) of ares is -1.0 or 1.0 for any x outside
       -1.0 ... 1.0, so the port sets the value directly.
     - Not ported: the SH-2 interrupt and DREQ lines and the timer register
@@ -161,7 +162,7 @@ const DEV_DECL sndDev_32X_PWM =
 
 #define PWM_DEFAULT_CLOCK	23011361	// NTSC: 53693175 Hz / 7 * 3
 #define PWM_FIFO_SIZE		3
-#define PWM_OUTPUT_SCALE	65536.0f
+#define PWM_OUTPUT_SCALE	32768.0f
 
 // FIFO of 12-bit pulse widths. An empty FIFO keeps returning its last value.
 typedef struct _pwm_fifo
