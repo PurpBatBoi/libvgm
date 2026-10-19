@@ -26,12 +26,17 @@
       Accuracy" option off (ares' default): 128 APU clocks, then the channel
       outputs are added up. The sample rate is clock / 128 (24000 Hz for the
       VGM clock 3072000).
-    - The 128 ticks are not run one by one. A channel steps from one match of
-      its period with its pitch to the next (ws_chn_advance explains why that
-      gives the same period and sample offset), channel 3 in two runs when its
-      sweep steps in between, channel 4 stepping its noise register once for
-      each match. That is 18 times faster than ares' own loop (20 ns instead
-      of 360 ns per sample), and bit for bit the same.
+    - The 128 ticks are not run one by one. A channel keeps the ticks to the
+      next match of its period with its pitch instead of the period, and steps
+      from one match to the next (ws_chn_set_pitch explains why that gives the
+      same period and sample offset), channel 3 in two runs when its sweep
+      steps in between, channel 4 stepping its noise register once for each
+      match.
+    - The mix is not added up again for every sample: a channel's level
+      changes only when its sample offset moves on, or with a write, a mute
+      change or a reset, which mark what they change as stale (mix_stale).
+    - With both, a sample takes about 9 ns instead of ares' 360 ns (four
+      channels playing), and bit for bit the same.
     - The registers are the ports 0x80 ... 0x9F of the console. The VGM
       command 0xBC and the DAC streams add 0x80 to the register number, so
       this device gets the port number (A8D8). The wave RAM is written
@@ -189,12 +194,14 @@ const DEV_DECL sndDev_WSwan =
 #define WS_PITCH_MASK		0x07FF		// 11 bit pitch and period
 #define WS_OFFSET_MASK		0x1F		// 32 samples (4 bit) per wave table
 #define WS_LFSR_MASK		0x7FFF		// 15 bit noise register
+#define WS_MIX_BASE		0x10		// mix_stale: the base level (bits 0 ... 3: the channel levels)
+#define WS_MIX_ALL		0x1F		// mix_stale: everything
 
 // the four wave channels (ares' Channel1 ... Channel4 io.pitch / state.period / state.sampleOffset)
 typedef struct _ws_channel
 {
 	UINT16 pitch;		// 11 bit
-	UINT16 period;		// 11 bit down counter
+	UINT16 counter;		// 1 ... 2048: ticks to the next match of the period with the pitch (ws_chn_advance)
 	UINT8 volume_left;	// 4 bit
 	UINT8 volume_right;	// 4 bit
 	UINT8 sample_offset;	// 5 bit, position in the wave table
@@ -258,17 +265,133 @@ typedef struct _wsa_state
 	UINT8 seq_dbg_ch_force2;
 	UINT8 seq_dbg_ch_force4;
 
+	// The mix (the sum of the channel outputs), kept by ws_run(): a channel's level changes only when its sample offset
+	// moves on, or with a write, a mute change or a reset, which mark the parts they change as stale.
+	UINT8 mix_stale;	// bit 0 ... 3 = channel 1 ... 4 (volume and level), WS_MIX_BASE = base
+	UINT8 mix_volume_left[4];	// volume of a heard channel, 0 for one that is off, muted, held or in voice mode
+	UINT8 mix_volume_right[4];
+	UINT16 mix_level_left[4];	// sample * volume
+	UINT16 mix_level_right[4];
+	UINT16 mix_base_left;	// APU::sequencerClear() level plus the channel 2 voice
+	UINT16 mix_base_right;
+
 	UINT8 ram[WS_RAM_SIZE];
 } wsa_state;
 
 static const UINT8 noise_taps[8] = {14, 10, 13, 4, 8, 6, 9, 11};
 
 
-// ares' APU::sample(): 4 bit sample number "index" of channel "chn" (0 ... 3)
-INLINE UINT8 ws_sample(const wsa_state* chip, UINT8 chn, UINT8 index)
+// ares counts the period (an 11 bit down counter) down by one per tick and, when it equals the pitch, restarts it at 0 and
+// moves the sample offset on. So the first match comes ((period - pitch - 1) mod 2048) + 1 ticks from now, and the next ones
+// 2048 - pitch ticks after each other (the period restarts at 0). The channel keeps that number of ticks (the counter)
+// instead of the period and steps from match to match instead of tick to tick, which gives the same matches as the ticks
+// (the registers do not change in between). The period is (counter + pitch) mod 2048.
+INLINE void ws_chn_set_pitch(WS_CHANNEL* chn, UINT16 pitch)
 {
+	UINT16 period = (UINT16)((chn->counter + chn->pitch) & WS_PITCH_MASK);
+
+	chn->pitch = pitch;
+	chn->counter = (UINT16)(((period - pitch - 1) & WS_PITCH_MASK) + 1);
+}
+
+// ws_chn_advance() when the "ticks" reach the next match: the first match, then one every 2048 - pitch ticks
+static UINT32 ws_chn_match(WS_CHANNEL* chn, UINT32 ticks)
+{
+	UINT32 step = (WS_PITCH_MASK + 1) - chn->pitch;
+	UINT32 matches = 1;
+
+	ticks -= chn->counter;	// the ticks after the first match
+	if (ticks >= step)
+	{
+		matches += ticks / step;
+		ticks %= step;
+	}
+	chn->counter = (UINT16)(step - ticks);
+	chn->sample_offset = (UINT8)((chn->sample_offset + matches) & WS_OFFSET_MASK);
+	return matches;
+}
+
+// ChannelN::tick() done "ticks" times. Returns how often the sample offset moved on.
+INLINE UINT32 ws_chn_advance(WS_CHANNEL* chn, UINT32 ticks)
+{
+	if (! chn->enable)
+		return 0;
+	if (ticks < chn->counter)
+	{
+		chn->counter = (UINT16)(chn->counter - ticks);
+		return 0;
+	}
+	return ws_chn_match(chn, ticks);
+}
+
+// Channel3::sweep()
+INLINE void ws_sweep(wsa_state* chip)
+{
+	WS_CHANNEL* chn = &chip->chn[2];
+
+	if (chip->sweep && --chip->sweep_counter < 0)
+	{
+		chip->sweep_counter = chip->sweep_time;
+		ws_chn_set_pitch(chn, (UINT16)((chn->pitch + chip->sweep_value) & WS_PITCH_MASK));
+	}
+}
+
+// Channel3::tick() and the sweep clock of APU::main() for "ticks" ticks. The sweep steps after the tick where the 13 bit
+// sweep clock wraps to 0 (every tick when the sequencer debug bit says so), so the channel runs up to that tick first.
+// With the sweep off, a sweep step does nothing, so without a step (or with the sweep off) the sweep clock only counts.
+// Returns the matches.
+INLINE UINT32 ws_sweep_advance(wsa_state* chip, UINT32 ticks)
+{
+	UINT32 matches = 0;
+	UINT32 step;
+
+	if (! chip->sweep || (! chip->seq_dbg_sweep_clock && chip->sweep_clock + ticks < 0x2000))
+	{
+		chip->sweep_clock = (UINT16)((chip->sweep_clock + ticks) & 0x1FFF);
+		return ws_chn_advance(&chip->chn[2], ticks);
+	}
+	while (ticks > 0)
+	{
+		step = chip->seq_dbg_sweep_clock ? 1 : 0x2000 - chip->sweep_clock;
+		if (step > ticks)
+			step = ticks;
+		matches += ws_chn_advance(&chip->chn[2], step);
+		chip->sweep_clock = (UINT16)((chip->sweep_clock + step) & 0x1FFF);
+		if (chip->sweep_clock == 0 || chip->seq_dbg_sweep_clock)
+			ws_sweep(chip);
+		ticks -= step;
+	}
+	return matches;
+}
+
+// Channel4::tick() "ticks" times: every move of the sample offset steps the noise register (the noise registers do not
+// change in between, so the steps can follow the whole run). Returns the matches.
+INLINE UINT32 ws_noise_advance(wsa_state* chip, UINT32 ticks)
+{
+	UINT32 matches;
+	UINT32 steps;
+	UINT8 tap;
+
+	matches = ws_chn_advance(&chip->chn[3], ticks);
+	if (! matches || ! chip->noise_update || chip->seq_dbg_noise)
+		return matches;
+	tap = noise_taps[chip->noise_mode];
+	for (steps = matches; steps > 0; steps --)
+	{
+		chip->noise_output = (UINT8)((1 ^ (chip->noise_lfsr >> 7) ^ (chip->noise_lfsr >> tap)) & 1);
+		chip->noise_lfsr = (UINT16)(((chip->noise_lfsr << 1) | chip->noise_output) & WS_LFSR_MASK);
+	}
+	return matches;
+}
+
+// ares' APU::sample() for channel "chn" (0 ... 3) at its sample offset, and the noise output of channel 4
+INLINE UINT8 ws_sample(const wsa_state* chip, UINT8 chn)
+{
+	UINT8 index = chip->chn[chn].sample_offset;
 	UINT8 data;
 
+	if (chn == 3 && chip->noise)
+		return chip->noise_output ? 0x0F : 0x00;
 	if (chip->seq_dbg_ch_force4)
 		return 4;
 	if (chip->seq_dbg_ch_force2)
@@ -278,148 +401,77 @@ INLINE UINT8 ws_sample(const wsa_state* chip, UINT8 chn, UINT8 index)
 	return (index & 1) ? (data >> 4) : (data & 0x0F);
 }
 
-// ChannelN::tick() done "ticks" times. Returns how often the sample offset moved on.
-// ares counts the period down by one per tick and, when it equals the pitch, restarts it at 0 and moves the sample offset
-// on. So the first match comes ((period - pitch - 1) mod 2048) + 1 ticks from now, and the next ones 2048 - pitch ticks
-// after each other (the period restarts at 0). This steps from match to match instead of tick to tick, which gives the
-// same period and sample offset as the ticks (the registers do not change in between).
-INLINE UINT32 ws_chn_advance(WS_CHANNEL* chn, UINT32 ticks)
+// ChannelN::output(): the level of channel "chn" in the mix, after its sample changed
+INLINE void ws_mix_level(wsa_state* chip, UINT8 chn)
 {
-	UINT32 matches = 0;
-	UINT32 next;
+	UINT8 sample = ws_sample(chip, chn);
 
-	if (! chn->enable)
-		return 0;
-	next = ((chn->period - chn->pitch - 1) & WS_PITCH_MASK) + 1;
-	while (ticks >= next)
-	{
-		ticks -= next;
-		matches ++;
-		chn->period = 0;
-		next = (WS_PITCH_MASK + 1) - chn->pitch;
-	}
-	chn->period = (UINT16)((chn->period - ticks) & WS_PITCH_MASK);
-	chn->sample_offset = (UINT8)((chn->sample_offset + matches) & WS_OFFSET_MASK);
-	return matches;
+	chip->mix_level_left[chn] = (UINT16)(sample * chip->mix_volume_left[chn]);
+	chip->mix_level_right[chn] = (UINT16)(sample * chip->mix_volume_right[chn]);
 }
 
-// Channel3::sweep()
-INLINE void ws_sweep(wsa_state* chip)
+// the stale parts of the mix: the volume (0 for a channel that is off, muted, held or in voice mode) and level of the
+// stale channels, and APU::sequencerClear() plus the channel 2 voice mode (the volume register is the sample, heard even
+// when the channel is off) in the base
+static void ws_mix_prepare(wsa_state* chip)
 {
-	if (chip->sweep && --chip->sweep_counter < 0)
+	UINT8 held;
+	UINT8 heard;
+	UINT8 volume;
+	UINT8 chn;
+
+	held = chip->seq_dbg_hold || chip->seq_dbg_output_force55;
+	for (chn = 0; chn < 4; chn ++)
 	{
-		chip->sweep_counter = chip->sweep_time;
-		chip->chn[2].pitch = (UINT16)((chip->chn[2].pitch + chip->sweep_value) & WS_PITCH_MASK);
+		if (! (chip->mix_stale & (1 << chn)))
+			continue;
+		heard = ! held && chip->chn[chn].enable && ! (chip->mute & (1 << chn)) && ! (chn == 1 && chip->voice);
+		chip->mix_volume_left[chn] = heard ? chip->chn[chn].volume_left : 0;
+		chip->mix_volume_right[chn] = heard ? chip->chn[chn].volume_right : 0;
+		ws_mix_level(chip, chn);
 	}
-}
-
-// Channel3::tick() and the sweep clock of APU::main() for "ticks" ticks. The sweep steps after the tick where the 13 bit
-// sweep clock wraps to 0 (every tick when the sequencer debug bit says so), so the channel runs up to that tick first.
-INLINE void ws_sweep_advance(wsa_state* chip, UINT32 ticks)
-{
-	UINT32 step;
-
-	while (ticks > 0)
+	if (chip->mix_stale & WS_MIX_BASE)
 	{
-		step = chip->seq_dbg_sweep_clock ? 1 : 0x2000 - chip->sweep_clock;
-		if (step > ticks)
-			step = ticks;
-		ws_chn_advance(&chip->chn[2], step);
-		chip->sweep_clock = (UINT16)((chip->sweep_clock + step) & 0x1FFF);
-		if (chip->sweep_clock == 0 || chip->seq_dbg_sweep_clock)
-			ws_sweep(chip);
-		ticks -= step;
+		chip->mix_base_left = chip->mix_base_right = chip->seq_dbg_output_force55 ? 0x55 : 0;
+		if (chip->voice && ! held && ! (chip->mute & 0x02))
+		{
+			volume = (UINT8)((chip->chn[1].volume_left << 4) | chip->chn[1].volume_right);
+			chip->mix_base_left += chip->voice_left_full ? volume : (chip->voice_left_half ? (volume >> 1) : 0);
+			chip->mix_base_right += chip->voice_right_full ? volume : (chip->voice_right_half ? (volume >> 1) : 0);
+		}
 	}
-}
-
-// Channel4::tick() "ticks" times: every move of the sample offset steps the noise register (the noise registers do not
-// change in between, so the steps can follow the whole run)
-INLINE void ws_noise_advance(wsa_state* chip, UINT32 ticks)
-{
-	UINT32 steps;
-	UINT8 tap;
-
-	steps = ws_chn_advance(&chip->chn[3], ticks);
-	if (! chip->noise_update || chip->seq_dbg_noise)
-		return;
-	tap = noise_taps[chip->noise_mode];
-	for (; steps > 0; steps --)
-	{
-		chip->noise_output = (UINT8)((1 ^ (chip->noise_lfsr >> 7) ^ (chip->noise_lfsr >> tap)) & 1);
-		chip->noise_lfsr = (UINT16)(((chip->noise_lfsr << 1) | chip->noise_output) & WS_LFSR_MASK);
-	}
-}
-
-// ChannelN::output() for the wave channels: adds sample * volume to the sums
-INLINE void ws_chn_output(const wsa_state* chip, UINT8 chn, UINT8 sample, UINT16* left, UINT16* right)
-{
-	*left += sample * chip->chn[chn].volume_left;
-	*right += sample * chip->chn[chn].volume_right;
-}
-
-INLINE DEV_SMPL ws_dc_process(WS_DC_FILTER* filter, INT32 level)
-{
-	double in = (double)level;
-
-	if (! filter->primed && in != 0.0)
-	{
-		filter->primed = 1;
-		filter->y = in;
-	}
-	filter->x = 0.999 * filter->x + in - filter->y;
-	filter->y = in;
-	return (DEV_SMPL)(filter->x < 0.0 ? filter->x - 0.5 : filter->x + 0.5);
+	chip->mix_stale = 0;
 }
 
 // APU::main() without "Pixel Accuracy": 128 clocks, then the outputs of the channels, then APU::output()
 // (the output level of both sides in outL / outR, before the DC removal)
 static void ws_run(wsa_state* chip, INT32* outL, INT32* outR)
 {
+	UINT32 matches[4];
 	UINT16 left;
 	UINT16 right;
-	UINT8 volume;
-	UINT8 held;
-
-	// APU::sequencerClear()
-	left = right = chip->seq_dbg_output_force55 ? 0x55 : 0;
 
 	// the 128 ticks of the channels (the channels do not depend on each other)
-	ws_chn_advance(&chip->chn[0], WS_CLOCKS_PER_SAMPLE);
-	ws_chn_advance(&chip->chn[1], WS_CLOCKS_PER_SAMPLE);
-	ws_sweep_advance(chip, WS_CLOCKS_PER_SAMPLE);
-	ws_noise_advance(chip, WS_CLOCKS_PER_SAMPLE);
+	matches[0] = ws_chn_advance(&chip->chn[0], WS_CLOCKS_PER_SAMPLE);
+	matches[1] = ws_chn_advance(&chip->chn[1], WS_CLOCKS_PER_SAMPLE);
+	matches[2] = ws_sweep_advance(chip, WS_CLOCKS_PER_SAMPLE);
+	matches[3] = ws_noise_advance(chip, WS_CLOCKS_PER_SAMPLE);
 
-	// APU::sequencerHeld()
-	held = chip->seq_dbg_hold || chip->seq_dbg_output_force55;
-	if (! held)
-	{
-		if (chip->chn[0].enable && ! (chip->mute & 0x01))
-			ws_chn_output(chip, 0, ws_sample(chip, 0, chip->chn[0].sample_offset), &left, &right);
-		if (chip->chn[1].enable || chip->voice)
-		{
-			if (chip->mute & 0x02)
-			{
-				// muted
-			}
-			else if (chip->voice)
-			{
-				volume = (UINT8)((chip->chn[1].volume_left << 4) | chip->chn[1].volume_right);
-				left += chip->voice_left_full ? volume : (chip->voice_left_half ? (volume >> 1) : 0);
-				right += chip->voice_right_full ? volume : (chip->voice_right_half ? (volume >> 1) : 0);
-			}
-			else
-			{
-				ws_chn_output(chip, 1, ws_sample(chip, 1, chip->chn[1].sample_offset), &left, &right);
-			}
-		}
-		if (chip->chn[2].enable && ! (chip->mute & 0x04))
-			ws_chn_output(chip, 2, ws_sample(chip, 2, chip->chn[2].sample_offset), &left, &right);
-		if (chip->chn[3].enable && ! (chip->mute & 0x08))
-		{
-			volume = chip->noise ? (chip->noise_output ? 0x0F : 0x00) : ws_sample(chip, 3, chip->chn[3].sample_offset);
-			ws_chn_output(chip, 3, volume, &left, &right);
-		}
-	}
+	// the outputs of the channels: a channel whose sample moved on has a new level
+	if (chip->mix_stale)
+		ws_mix_prepare(chip);
+	if (matches[0])
+		ws_mix_level(chip, 0);
+	if (matches[1])
+		ws_mix_level(chip, 1);
+	if (matches[2])
+		ws_mix_level(chip, 2);
+	if (matches[3])
+		ws_mix_level(chip, 3);
+	left = (UINT16)(chip->mix_base_left + chip->mix_level_left[0] + chip->mix_level_left[1] +
+		chip->mix_level_left[2] + chip->mix_level_left[3]);
+	right = (UINT16)(chip->mix_base_right + chip->mix_level_right[0] + chip->mix_level_right[1] +
+		chip->mix_level_right[2] + chip->mix_level_right[3]);
 
 	// APU::output(): the headphones count as connected when the song enables them
 	if (chip->headphones_enable)
@@ -436,6 +488,22 @@ static void ws_run(wsa_state* chip, INT32* outL, INT32* outR)
 		*outL = 0;
 		*outR = 0;
 	}
+}
+
+INLINE DEV_SMPL ws_dc_process(WS_DC_FILTER* filter, INT32 level)
+{
+	double in = (double)level;
+
+	if (! filter->primed && in != 0.0)
+	{
+		filter->primed = 1;
+		filter->y = in;
+	}
+	filter->x = 0.999 * filter->x + in - filter->y;
+	filter->y = in;
+	// rounded half away from 0: x - 0.5 written as x + -0.5 (the same result) lets the compiler select the constant
+	// instead of branching on the sign, which a song's output cannot predict
+	return (DEV_SMPL)(filter->x + (filter->x < 0.0 ? -0.5 : 0.5));
 }
 
 static void ws_update(void* info, UINT32 samples, DEV_SMPL** outputs)
@@ -459,9 +527,13 @@ static void ws_reset(void* info)
 {
 	wsa_state* chip = (wsa_state*)info;
 	size_t first = offsetof(wsa_state, chn);
+	UINT8 chn;
 
 	memset((UINT8*)chip + first, 0x00, sizeof(wsa_state) - first);
+	for (chn = 0; chn < 4; chn ++)
+		chip->chn[chn].counter = WS_PITCH_MASK + 1;	// period 0, pitch 0
 	chip->headphones_enable = 1;	// see the port notes
+	chip->mix_stale = WS_MIX_ALL;
 }
 
 static UINT8 device_start_wswan(const DEV_GEN_CFG* cfg, DEV_INFO* retDevInf)
@@ -504,14 +576,14 @@ static void ws_write_reg(void* info, UINT8 port, UINT8 data)
 	case 0x84:	// SND_CH3_PITCH
 	case 0x86:	// SND_CH4_PITCH
 		chn = &chip->chn[(port - 0x80) >> 1];
-		chn->pitch = (UINT16)((chn->pitch & 0x0700) | data);
+		ws_chn_set_pitch(chn, (UINT16)((chn->pitch & 0x0700) | data));
 		break;
 	case 0x81:
 	case 0x83:
 	case 0x85:
 	case 0x87:
 		chn = &chip->chn[(port - 0x80) >> 1];
-		chn->pitch = (UINT16)((chn->pitch & 0x00FF) | ((data & 0x07) << 8));
+		ws_chn_set_pitch(chn, (UINT16)((chn->pitch & 0x00FF) | ((data & 0x07) << 8)));
 		break;
 	case 0x88:	// SND_CH1_VOL
 	case 0x89:	// SND_CH2_VOL
@@ -520,7 +592,9 @@ static void ws_write_reg(void* info, UINT8 port, UINT8 data)
 		chn = &chip->chn[port - 0x88];
 		chn->volume_right = data & 0x0F;
 		chn->volume_left = data >> 4;
-		break;
+		// only this channel's volume changes, and the voice (the channel 2 volume) in the base
+		chip->mix_stale |= (UINT8)((1 << (port - 0x88)) | (port == 0x89 ? WS_MIX_BASE : 0));
+		return;
 	case 0x8C:	// SND_SWEEP_VALUE
 		chip->sweep_value = (INT8)data;
 		break;
@@ -566,6 +640,7 @@ static void ws_write_reg(void* info, UINT8 port, UINT8 data)
 		break;
 	// 0x9E (SND_VOLUME) is ignored, see the port notes
 	}
+	chip->mix_stale = WS_MIX_ALL;
 }
 
 static void ws_write_ram(void* info, UINT16 offset, UINT8 data)
@@ -573,7 +648,10 @@ static void ws_write_ram(void* info, UINT16 offset, UINT8 data)
 	wsa_state* chip = (wsa_state*)info;
 
 	if (offset < WS_RAM_SIZE)
+	{
 		chip->ram[offset] = data;
+		chip->mix_stale |= 0x0F;	// the levels of all channels (the wave tables)
+	}
 }
 
 static void ws_set_mute_mask(void* info, UINT32 MuteMask)
@@ -581,4 +659,5 @@ static void ws_set_mute_mask(void* info, UINT32 MuteMask)
 	wsa_state* chip = (wsa_state*)info;
 
 	chip->mute = (UINT8)(MuteMask & 0x0F);
+	chip->mix_stale = WS_MIX_ALL;
 }

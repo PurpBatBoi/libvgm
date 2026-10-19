@@ -5,9 +5,9 @@
 
 #ifndef SNDDEV_SELECT
 // undefine one of the variables to disable the cores
-#define EC_NES_APU2A03		// enable NES core apu2a03 (MIT)
+#define EC_NES_BEENES		// enable NES core BeeNES (MIT)
 // Note: The FDS core from NSFPlay is used by the MAME and NSFPlay NES cores.
-//       The APU2A03 core has its own FDS core.
+//       The BeeNES core has its own FDS core (purps_fds).
 #endif
 
 // cfg.flags: set to 1 to enable FDS sound

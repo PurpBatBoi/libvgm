@@ -29,11 +29,15 @@
 #include "../EmuStructs.h"
 #include "../panning.h"
 #include "nesintf.h"
-#include "nes_fds_2a03.h"
-#include "nes_synth_2a03.h"
+#include "../../libs/blep_filter/blep_filter.h"
+#include "purps_fds.h"
+#include "nes_filter.h"
 
-/* At most this many CPU cycles are rendered as one synth block. */
-#define CYCLE_SIZE	10000
+/* Output samples rendered as one band-limited frame at most. */
+#define FRAME_SAMPLES	1024
+/* blep_filter works on integer levels: the level 1.0 of the output (0x8000) is this, with room for the
+	overshoot of the band-limited steps. */
+#define LEVEL_ONE	0x4000
 /* The wave and mod units tick every 16 CPU cycles. */
 #define TICK_CYCLES	16
 
@@ -50,7 +54,7 @@ typedef struct
 	INT32 timer;	/* CPU cycles until the next tick */
 } FDS_ENVELOPE;
 
-typedef struct nesfds_2a03
+typedef struct purps_fds
 {
 	UINT32 clock_rate;
 	UINT32 sample_rate;
@@ -84,18 +88,17 @@ typedef struct nesfds_2a03
 	UINT8 muted;
 	float pan[2];
 
-	/* Cycles from the start of the block to the next tick. */
+	/* Cycles from the start of the frame to the next tick. */
 	UINT32 next_tick;
-	/* Output level as last handed to the synth. */
-	float level;
 	/* Output level of one step of wave * volume: 2.4 times a full square at full scale. */
 	float scale;
 
-	SYNTH synth;
-	LOW_PASS low_pass_2k;
-	FILTER_CHAIN filter;
-	float* block;
-} NESFDS_2A03;
+	/* The band-limited buffer, with the integer level last added to it. */
+	blip_t* blep;
+	INT32 blep_level;
+	NES_LOW_PASS low_pass_2k;
+	NES_OUTPUT_FILTER filter;
+} PURPS_FDS;
 
 /* "Master volume (0: full; 1: 2/3; 2: 2/4; 3: 2/5)" */
 static const float MASTER_VOLUME[4] = {1.0f, 2.0f / 3.0f, 2.0f / 4.0f, 2.0f / 5.0f};
@@ -104,13 +107,13 @@ static const float MASTER_VOLUME[4] = {1.0f, 2.0f / 3.0f, 2.0f / 4.0f, 2.0f / 5.
 /* ---- Envelopes ---- */
 
 /* CPU cycles per envelope tick: 8 * (e + 1) * (m + 1). */
-static INT32 envelope_period(const NESFDS_2A03* fds, const FDS_ENVELOPE* e)
+static INT32 envelope_period(const PURPS_FDS* fds, const FDS_ENVELOPE* e)
 {
 	return 8 * ((INT32)e->speed + 1) * ((INT32)fds->env_speed + 1);
 }
 
 /* $4080/$4084 */
-static void envelope_write(NESFDS_2A03* fds, FDS_ENVELOPE* e, UINT8 val)
+static void envelope_write(PURPS_FDS* fds, FDS_ENVELOPE* e, UINT8 val)
 {
 	e->off = (val & 0x80) ? 1 : 0;
 	e->increase = (val & 0x40) ? 1 : 0;
@@ -121,13 +124,13 @@ static void envelope_write(NESFDS_2A03* fds, FDS_ENVELOPE* e, UINT8 val)
 	e->timer = envelope_period(fds, e);
 }
 
-static UINT8 envelope_running(const NESFDS_2A03* fds, const FDS_ENVELOPE* e)
+static UINT8 envelope_running(const PURPS_FDS* fds, const FDS_ENVELOPE* e)
 {
 	return ! e->off && ! fds->env_halt && ! fds->wave_halt && fds->env_speed != 0;
 }
 
 /* Runs an envelope for `cycles` cycles. */
-static void envelope_run(NESFDS_2A03* fds, FDS_ENVELOPE* e, UINT32 cycles)
+static void envelope_run(PURPS_FDS* fds, FDS_ENVELOPE* e, UINT32 cycles)
 {
 	if (! envelope_running(fds, e))
 		return;
@@ -151,7 +154,7 @@ static void envelope_run(NESFDS_2A03* fds, FDS_ENVELOPE* e, UINT32 cycles)
 
 /* ---- Wave and mod units ---- */
 
-static UINT8 wave_position(const NESFDS_2A03* fds)
+static UINT8 wave_position(const PURPS_FDS* fds)
 {
 	return (UINT8)(fds->wave_acc >> 18);
 }
@@ -172,7 +175,7 @@ static UINT32 modulated_pitch(UINT16 pitch, INT32 counter, UINT8 gain)
 }
 
 /* Applies a mod table entry to the 7-bit signed mod counter, which wraps. */
-static void apply_mod_entry(NESFDS_2A03* fds, UINT8 entry)
+static void apply_mod_entry(PURPS_FDS* fds, UINT8 entry)
 {
 	if (entry == MOD_RESET)
 		fds->mod_counter = 0;
@@ -180,7 +183,7 @@ static void apply_mod_entry(NESFDS_2A03* fds, UINT8 entry)
 		fds->mod_counter = ((fds->mod_counter + MOD_ADJUST[entry] + 64) & 0x7F) - 64;
 }
 
-static void mod_tick(NESFDS_2A03* fds)
+static void mod_tick(PURPS_FDS* fds)
 {
 	UINT8 carry;
 
@@ -210,7 +213,7 @@ static void mod_tick(NESFDS_2A03* fds)
 	}
 }
 
-static void wave_tick(NESFDS_2A03* fds)
+static void wave_tick(PURPS_FDS* fds)
 {
 	if (fds->wave_halt)
 		return;
@@ -218,14 +221,14 @@ static void wave_tick(NESFDS_2A03* fds)
 }
 
 /* Volume gain changes take effect at wave position 0, where the PWM comparator latches. */
-static void latch_volume(NESFDS_2A03* fds)
+static void latch_volume(PURPS_FDS* fds)
 {
 	if (wave_position(fds) == 0)
 		fds->volume = fds->vol_env.gain;
 }
 
 /* The channel's output level, before filtering. */
-static float output_level(const NESFDS_2A03* fds)
+static float output_level(const PURPS_FDS* fds)
 {
 	UINT8 value;
 	UINT8 volume;
@@ -238,21 +241,22 @@ static float output_level(const NESFDS_2A03* fds)
 	return (float)(value * volume) * MASTER_VOLUME[fds->master_volume] * fds->scale;
 }
 
-static void add_level_delta(NESFDS_2A03* fds, UINT32 cycle)
+/* Adds a change of the output level `cycle` cycles into the frame as a band-limited step. */
+static void add_level_delta(PURPS_FDS* fds, UINT32 cycle)
 {
-	float level = output_level(fds);
+	INT32 value = (INT32)(output_level(fds) * LEVEL_ONE + 0.5f);
 
-	if (level != fds->level)
+	if (value != fds->blep_level)
 	{
-		synth_add_delta(&fds->synth, cycle, level - fds->level, 0.0f);
-		fds->level = level;
+		blip_add_delta(fds->blep, cycle, value - fds->blep_level);
+		fds->blep_level = value;
 	}
 }
 
-/* Runs a block of `cycles` cycles. */
-static void fds_run(NESFDS_2A03* fds, UINT32 cycles)
+/* Runs a frame of `cycles` cycles. */
+static void fds_run(PURPS_FDS* fds, UINT32 cycles)
 {
-	/* Register writes since the last block land at its start. */
+	/* Register writes since the last frame land at its start. */
 	add_level_delta(fds, 0);
 	while (fds->next_tick < cycles)
 	{
@@ -268,48 +272,43 @@ static void fds_run(NESFDS_2A03* fds, UINT32 cycles)
 }
 
 
-void* nesfds_2a03_create(UINT32 clock, UINT32 rate)
+void* purps_fds_create(UINT32 clock, UINT32 rate)
 {
-	NESFDS_2A03* fds;
+	PURPS_FDS* fds;
 
 	if (clock == 0 || rate == 0 || rate > clock / 4)
 		return NULL;
-	fds = (NESFDS_2A03*)calloc(1, sizeof(NESFDS_2A03));
+	fds = (PURPS_FDS*)calloc(1, sizeof(PURPS_FDS));
 	if (fds == NULL)
 		return NULL;
 	fds->clock_rate = clock;
 	fds->sample_rate = rate;
-	if (! synth_init(&fds->synth, clock, rate, CYCLE_SIZE))
+	fds->blep = blip_new(FRAME_SAMPLES);
+	if (fds->blep == NULL)
 	{
-		nesfds_2a03_destroy(fds);
+		purps_fds_destroy(fds);
 		return NULL;
 	}
-	fds->block = (float*)calloc(fds->synth.length, sizeof(float));
-	if (fds->block == NULL)
-	{
-		nesfds_2a03_destroy(fds);
-		return NULL;
-	}
+	blip_set_rates(fds->blep, clock, rate);
 	/* The wiki: "roughly 2.4x the maximum volume of the APU square". A square at volume 15
-		reaches 95.52 / (8128 / 15 + 100) on the APU's mixer scale (nes_apu_2a03.c). */
+		reaches 95.52 / (8128 / 15 + 100) on the APU's mixer scale (beenes_intf.c). */
 	fds->scale = 2.4f * (95.52f / (8128.0f / 15.0f + 100.0f)) / (63.0f * 32.0f);
 	fds->pan[0] = fds->pan[1] = 1.0f;
-	nesfds_2a03_reset(fds);
+	purps_fds_reset(fds);
 	return fds;
 }
 
-void nesfds_2a03_destroy(void* chip)
+void purps_fds_destroy(void* chip)
 {
-	NESFDS_2A03* fds = (NESFDS_2A03*)chip;
+	PURPS_FDS* fds = (PURPS_FDS*)chip;
 
-	synth_free(&fds->synth);
-	free(fds->block);
+	blip_delete(fds->blep);
 	free(fds);
 }
 
-void nesfds_2a03_reset(void* chip)
+void purps_fds_reset(void* chip)
 {
-	NESFDS_2A03* fds = (NESFDS_2A03*)chip;
+	PURPS_FDS* fds = (PURPS_FDS*)chip;
 
 	memset(fds->wave, 0, sizeof(fds->wave));
 	memset(fds->mod_table, 0, sizeof(fds->mod_table));
@@ -328,7 +327,6 @@ void nesfds_2a03_reset(void* chip)
 	fds->hold_value = 0;
 	fds->master_volume = 0;
 	fds->next_tick = 0;
-	fds->level = 0.0f;
 
 	/* VGMs start after the BIOS has run, so the registers it sets start at its values:
 		$4023 = $83, $408A = $E8 and $4080 = $80. */
@@ -337,14 +335,15 @@ void nesfds_2a03_reset(void* chip)
 	envelope_write(fds, &fds->vol_env, 0x80);
 	envelope_write(fds, &fds->mod_env, 0x80);
 
-	synth_clear(&fds->synth);
-	low_pass_init(&fds->low_pass_2k, (float)fds->sample_rate, 2000.0f);
-	filter_init(&fds->filter, (float)fds->sample_rate);
+	blip_clear(fds->blep);
+	fds->blep_level = 0;
+	nes_low_pass_init(&fds->low_pass_2k, (float)fds->sample_rate, 2000.0f);
+	nes_output_filter_init(&fds->filter, (float)fds->sample_rate);
 }
 
-void nesfds_2a03_write(void* chip, UINT16 addr, UINT8 data)
+void purps_fds_write(void* chip, UINT16 addr, UINT8 data)
 {
-	NESFDS_2A03* fds = (NESFDS_2A03*)chip;
+	PURPS_FDS* fds = (PURPS_FDS*)chip;
 
 	if (addr == 0x4023)
 	{
@@ -433,9 +432,9 @@ void nesfds_2a03_write(void* chip, UINT16 addr, UINT8 data)
 	}
 }
 
-UINT8 nesfds_2a03_read(void* chip, UINT16 addr)
+UINT8 purps_fds_read(void* chip, UINT16 addr)
 {
-	NESFDS_2A03* fds = (NESFDS_2A03*)chip;
+	PURPS_FDS* fds = (PURPS_FDS*)chip;
 
 	/* Bits 6-7 of most reads come from open bus, which reads as 01. */
 	if (addr >= 0x4040 && addr <= 0x407F)
@@ -456,23 +455,23 @@ UINT8 nesfds_2a03_read(void* chip, UINT16 addr)
 	return 0x00;
 }
 
-void nesfds_2a03_set_options(void* chip, UINT32 flags)
+void purps_fds_set_options(void* chip, UINT32 flags)
 {
-	NESFDS_2A03* fds = (NESFDS_2A03*)chip;
+	PURPS_FDS* fds = (PURPS_FDS*)chip;
 
 	fds->reset_4085 = (flags & OPT_NES_4085_RESET) ? 1 : 0;
 }
 
-void nesfds_2a03_set_mute(void* chip, UINT8 mute)
+void purps_fds_set_mute(void* chip, UINT8 mute)
 {
-	NESFDS_2A03* fds = (NESFDS_2A03*)chip;
+	PURPS_FDS* fds = (PURPS_FDS*)chip;
 
 	fds->muted = mute;
 }
 
-void nesfds_2a03_set_panning(void* chip, INT16 pan)
+void purps_fds_set_panning(void* chip, INT16 pan)
 {
-	NESFDS_2A03* fds = (NESFDS_2A03*)chip;
+	PURPS_FDS* fds = (PURPS_FDS*)chip;
 	INT32 gains[2];
 
 	Panning_Calculate(gains, pan);
@@ -480,39 +479,33 @@ void nesfds_2a03_set_panning(void* chip, INT16 pan)
 	fds->pan[1] = (float)gains[1] / PANNING_NORMAL;
 }
 
-void nesfds_2a03_update(void* chip, UINT32 samples, DEV_SMPL** outputs)
+void purps_fds_update(void* chip, UINT32 samples, DEV_SMPL** outputs)
 {
-	NESFDS_2A03* fds = (NESFDS_2A03*)chip;
-	UINT32 done = 0;
+	PURPS_FDS* fds = (PURPS_FDS*)chip;
+	short pcm[FRAME_SAMPLES];
+	UINT32 done;
+	UINT32 count;
+	UINT32 cycles;
+	UINT32 i;
+	float y;
 
-	while (done < samples)
+	for (done = 0; done < samples; done += count)
 	{
-		SYNTH* s = &fds->synth;
-		INT64 needed = ((INT64)(samples - done) << SYNTH_FRAC_BITS) - s->offset;
-		UINT32 cycles;
-		UINT32 count;
-		UINT32 i;
-
-		/* The fewest cycles that complete the remaining samples, at most one block. */
-		if (needed > (INT64)CYCLE_SIZE * s->samples_per_cycle)
-			cycles = CYCLE_SIZE;
-		else
-			cycles = (UINT32)((needed + s->samples_per_cycle - 1) / s->samples_per_cycle);
+		count = samples - done;
+		if (count > FRAME_SAMPLES)
+			count = FRAME_SAMPLES;
+		cycles = (UINT32)blip_clocks_needed(fds->blep, (int)count);
 		fds_run(fds, cycles);
-		count = synth_end_block(s, cycles);
-		if (count > samples - done)
-			count = samples - done;
-
-		synth_read(s, 0, count, fds->block);
+		blip_end_frame(fds->blep, cycles);
+		blip_read_samples(fds->blep, pcm, (int)count, 0);
 		for (i = 0; i < count; i ++)
 		{
-			/* The FDS's own ~2 kHz low-pass, then the console's output filters. */
-			float y = filter_consume(&fds->filter, low_pass_consume(&fds->low_pass_2k, fds->block[i])) * 0x8000;
-
+			/* The FDS's own ~2 kHz low-pass, then the console's output filters, back to the 0x8000 = level 1.0
+				scale of the output. */
+			y = nes_output_filter(&fds->filter, nes_low_pass(&fds->low_pass_2k, (float)pcm[i])) *
+				(0x8000 / (float)LEVEL_ONE);
 			outputs[0][done + i] += (DEV_SMPL)(y * fds->pan[0]);
 			outputs[1][done + i] += (DEV_SMPL)(y * fds->pan[1]);
 		}
-		synth_consume(s, count);
-		done += count;
 	}
 }

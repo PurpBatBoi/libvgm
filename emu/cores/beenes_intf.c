@@ -1,7 +1,6 @@
 /*
 	MIT License
 
-	Copyright (c) 2021 Luke Petherbridge <me@lukeworks.tech>
 	Copyright (c) 2026 Purpbatboi
 
 	Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -29,29 +28,31 @@
 #include "../../stdtype.h"
 #include "../EmuStructs.h"
 #include "../panning.h"
+#include "../../libs/blep_filter/blep_filter.h"
 #include "nesintf.h"
-#include "nes_apu_2a03.h"
-#include "nes_synth_2a03.h"
-#include "apu2a03.h"
+#include "beenes_intf.h"
+#include "nes_filter.h"
+#include "beenes_apu.h"
 
-/* How many CPU cycles a mixing block spans at most. */
-#define CYCLE_SIZE	10000
+#define CHN_COUNT	BEENES_C_TOTAL
 
-#define CHN_COUNT	LSN_C_TOTAL
+/* Output samples rendered as one band-limited frame at most. */
+#define FRAME_SAMPLES	1024
+/* blep_filter works on integer levels: the mixed level 1.0 (the loudest the non-linear mixer gives)
+	is this, which leaves room for the overshoot of the band-limited steps below 32767. */
+#define LEVEL_ONE	0x4000
 
-typedef struct nesapu_2a03
+typedef struct beenes_intf
 {
 	UINT32 sample_rate;
 	UINT8 pal;
 
-	lsn_apu2a03_t core;
+	beenes_apu_t core;
 
-	SYNTH synth;
-	FILTER_CHAIN filter[2];
-	/* Mixed level as of the last change handed to the synth, so a change is a delta from it. */
-	float mixed_level[2];
-	/* Scratch for one block of samples. */
-	float* block;
+	/* One band-limited buffer per side, with the integer level last added to it. */
+	blip_t* blep[2];
+	INT32 blep_level[2];
+	NES_OUTPUT_FILTER filter[2];
 
 	/* DPCM sample memory for CPU addresses $8000-$FFFF. */
 	const UINT8* memory;
@@ -64,51 +65,51 @@ typedef struct nesapu_2a03
 	/* The console's non-linear mixer, from https://www.nesdev.org/wiki/APU_Mixer */
 	float pulse_table[31];
 	float tnd_table[203];
-} NESAPU_2A03;
+} BEENES_INTF;
 
 static UINT8 apu_dma_read(void* user_data, UINT16 addr)
 {
-	const NESAPU_2A03* apu = (const NESAPU_2A03*)user_data;
+	const BEENES_INTF* apu = (const BEENES_INTF*)user_data;
 
 	return (apu->memory != NULL && addr >= 0x8000) ? apu->memory[addr - 0x8000] : 0x00;
 }
 
 /* Powers the APU core up from scratch. */
-static void apu_start_core(NESAPU_2A03* apu)
+static void apu_start_core(BEENES_INTF* apu)
 {
-	lsn_apu2a03_init(&apu->core, apu->pal ? LSN_AT_PAL : LSN_AT_NTSC);
+	beenes_apu_init(&apu->core, apu->pal ? BEENES_AT_PAL : BEENES_AT_NTSC);
 	/* The core fetches each DPCM byte through dma_read. */
-	lsn_apu2a03_set_dma_read(&apu->core, apu, apu_dma_read);
+	beenes_apu_set_dma_read(&apu->core, apu, apu_dma_read);
 	/* Famiclone duty order: 25% and 50% swapped. */
 	apu->core.swap_duty = (apu->options & OPT_NES_DUTY_SWAP) ? 1 : 0;
 }
 
 /* The five channels mixed, into out[0] (left) and out[1] (right). */
-static void apu_mix_level(const NESAPU_2A03* apu, float* out)
+static void apu_mix_level(const BEENES_INTF* apu, float* out)
 {
 	/* The linear approximation's gains, from the same wiki page. */
 	static const float LINEAR_GAIN[CHN_COUNT] = {0.00752f, 0.00752f, 0.00851f, 0.00494f, 0.00335f};
-	const lsn_triangle_t* tri = &apu->core.triangle;
+	const beenes_triangle_t* tri = &apu->core.triangle;
 	UINT8 mute = apu->mute_mask;
 	UINT8 raw[CHN_COUNT];
 	float level[CHN_COUNT];
 	UINT8 chn;
 
-	lsn_apu2a03_get_channel_levels(&apu->core, raw);
+	beenes_apu_get_channel_levels(&apu->core, raw);
 	for (chn = 0; chn < CHN_COUNT; chn ++)
 		level[chn] = (mute & (1 << chn)) ? 0.0f : (float)raw[chn];
-	/* Ultrasonic periods; a console's low-pass filter leaves the middle of the wave, which
-		saves the synth a step on nearly every cycle. */
+	/* At the shortest periods the triangle is ultrasonic, and the console's low-pass leaves only
+		the middle of its wave. Using that level also saves a step on nearly every cycle. */
 	if (! (mute & 0x04) && tri->sequencer.reload < 2 && tri->length.counter > 0 &&
 		tri->linear.linear_counter > 0)
-		level[LSN_C_TRIANGLE] = 7.5f;
+		level[BEENES_C_TRIANGLE] = 7.5f;
 
 	if (apu->options & OPT_NES_NONLINEAR_MIXER)
 	{
-		UINT32 tnd = (UINT32)(3.0f * level[LSN_C_TRIANGLE] + 2.0f * level[LSN_C_NOISE] +
-			level[LSN_C_DMC]);
+		UINT32 tnd = (UINT32)(3.0f * level[BEENES_C_TRIANGLE] + 2.0f * level[BEENES_C_NOISE] +
+			level[BEENES_C_DMC]);
 
-		out[0] = apu->pulse_table[(UINT32)(level[LSN_C_PULSE_0] + level[LSN_C_PULSE_1])] +
+		out[0] = apu->pulse_table[(UINT32)(level[BEENES_C_PULSE_0] + level[BEENES_C_PULSE_1])] +
 			apu->tnd_table[tnd];
 		out[1] = out[0];
 	}
@@ -124,50 +125,53 @@ static void apu_mix_level(const NESAPU_2A03* apu, float* out)
 	}
 }
 
-/* Clocks the core `cycles` times, handing the synth each change of the mixed level. */
-static void apu_run(NESAPU_2A03* apu, UINT32 cycles)
+/* Clocks the core `cycles` times, adding each change of the mixed level as a band-limited step. */
+static void apu_run(BEENES_INTF* apu, UINT32 cycles)
 {
 	UINT32 cycle;
 	float level[2];
+	INT32 value;
+	UINT8 side;
 
 	for (cycle = 0; cycle < cycles; cycle ++)
 	{
-		lsn_apu2a03_tick(&apu->core);
+		beenes_apu_tick(&apu->core);
 		apu_mix_level(apu, level);
-		if (level[0] != apu->mixed_level[0] || level[1] != apu->mixed_level[1])
+		for (side = 0; side < 2; side ++)
 		{
-			synth_add_delta(&apu->synth, cycle,
-				level[0] - apu->mixed_level[0], level[1] - apu->mixed_level[1]);
-			apu->mixed_level[0] = level[0];
-			apu->mixed_level[1] = level[1];
+			value = (INT32)(level[side] * LEVEL_ONE + 0.5f);
+			if (value != apu->blep_level[side])
+			{
+				blip_add_delta(apu->blep[side], cycle, value - apu->blep_level[side]);
+				apu->blep_level[side] = value;
+			}
 		}
 	}
 }
 
-void* nesapu_2a03_create(UINT32 clock, UINT32 rate)
+void* beenes_intf_create(UINT32 clock, UINT32 rate)
 {
-	NESAPU_2A03* apu;
+	BEENES_INTF* apu;
 	int i;
 
 	if (clock == 0 || rate == 0 || rate > clock / 4)
 		return NULL;
-	apu = (NESAPU_2A03*)calloc(1, sizeof(NESAPU_2A03));
+	apu = (BEENES_INTF*)calloc(1, sizeof(BEENES_INTF));
 	if (apu == NULL)
 		return NULL;
 	apu->sample_rate = rate;
 	/* PAL consoles run at 1.66 MHz, NTSC at 1.79 MHz and Dendy (NTSC timing) at 1.77 MHz. */
 	apu->pal = (clock < 1700000) ? 1 : 0;
 
-	if (! synth_init(&apu->synth, clock, rate, CYCLE_SIZE))
+	for (i = 0; i < 2; i ++)
 	{
-		nesapu_2a03_destroy(apu);
-		return NULL;
-	}
-	apu->block = (float*)calloc(apu->synth.length, sizeof(float));
-	if (apu->block == NULL)
-	{
-		nesapu_2a03_destroy(apu);
-		return NULL;
+		apu->blep[i] = blip_new(FRAME_SAMPLES);
+		if (apu->blep[i] == NULL)
+		{
+			beenes_intf_destroy(apu);
+			return NULL;
+		}
+		blip_set_rates(apu->blep[i], clock, rate);
 	}
 
 	/* Entry 0 of each mixer table is left at 0 by calloc. */
@@ -180,38 +184,41 @@ void* nesapu_2a03_create(UINT32 clock, UINT32 rate)
 	apu->options = OPT_NES_UNMUTE_ON_RESET | OPT_NES_NONLINEAR_MIXER | OPT_NES_ENABLE_4011 |
 		OPT_NES_ENABLE_PNOISE;
 
-	nesapu_2a03_reset(apu);
+	beenes_intf_reset(apu);
 	return apu;
 }
 
-void nesapu_2a03_destroy(void* chip)
+void beenes_intf_destroy(void* chip)
 {
-	NESAPU_2A03* apu = (NESAPU_2A03*)chip;
+	BEENES_INTF* apu = (BEENES_INTF*)chip;
 
-	synth_free(&apu->synth);
-	free(apu->block);
+	blip_delete(apu->blep[0]);
+	blip_delete(apu->blep[1]);
 	free(apu);
 }
 
-void nesapu_2a03_reset(void* chip)
+void beenes_intf_reset(void* chip)
 {
-	NESAPU_2A03* apu = (NESAPU_2A03*)chip;
+	BEENES_INTF* apu = (BEENES_INTF*)chip;
+	UINT8 side;
 
 	apu_start_core(apu);
-	apu->mixed_level[0] = apu->mixed_level[1] = 0.0f;
-	synth_clear(&apu->synth);
-	filter_init(&apu->filter[0], (float)apu->sample_rate);
-	filter_init(&apu->filter[1], (float)apu->sample_rate);
+	for (side = 0; side < 2; side ++)
+	{
+		blip_clear(apu->blep[side]);
+		apu->blep_level[side] = 0;
+		nes_output_filter_init(&apu->filter[side], (float)apu->sample_rate);
+	}
 
 	/* Some VGMs were logged without the driver's $4015 write, and only play with the pulse,
 		triangle and noise channels enabled from the start. */
 	if (apu->options & OPT_NES_UNMUTE_ON_RESET)
-		nesapu_2a03_write(apu, 0x15, 0x0F);
+		beenes_intf_write(apu, 0x15, 0x0F);
 }
 
-void nesapu_2a03_write(void* chip, UINT8 offset, UINT8 data)
+void beenes_intf_write(void* chip, UINT8 offset, UINT8 data)
 {
-	NESAPU_2A03* apu = (NESAPU_2A03*)chip;
+	BEENES_INTF* apu = (BEENES_INTF*)chip;
 
 	switch(offset)
 	{
@@ -225,19 +232,19 @@ void nesapu_2a03_write(void* chip, UINT8 offset, UINT8 data)
 			return;
 		break;
 	}
-	lsn_apu2a03_write(&apu->core, (UINT16)(0x4000 | offset), data);
+	beenes_apu_write(&apu->core, (UINT16)(0x4000 | offset), data);
 }
 
-UINT8 nesapu_2a03_read(void* chip, UINT8 offset)
+UINT8 beenes_intf_read(void* chip, UINT8 offset)
 {
-	NESAPU_2A03* apu = (NESAPU_2A03*)chip;
+	BEENES_INTF* apu = (BEENES_INTF*)chip;
 
-	return lsn_apu2a03_read(&apu->core, (UINT16)(0x4000 | offset));
+	return beenes_apu_read(&apu->core, (UINT16)(0x4000 | offset));
 }
 
-void nesapu_2a03_set_memory(void* chip, const UINT8* memory)
+void beenes_intf_set_memory(void* chip, const UINT8* memory)
 {
-	NESAPU_2A03* apu = (NESAPU_2A03*)chip;
+	BEENES_INTF* apu = (BEENES_INTF*)chip;
 
 	apu->memory = memory;
 }
@@ -246,24 +253,24 @@ void nesapu_2a03_set_memory(void* chip, const UINT8* memory)
 	next reset. The others (PHASE_REFRESH, DPCM_ANTI_CLICK, RANDOMIZE_NOISE, TRI_MUTE, TRI_NULL)
 	tune the MAME and NSFPlay cores' approximations of behavior this core emulates as the
 	hardware does. */
-void nesapu_2a03_set_options(void* chip, UINT32 flags)
+void beenes_intf_set_options(void* chip, UINT32 flags)
 {
-	NESAPU_2A03* apu = (NESAPU_2A03*)chip;
+	BEENES_INTF* apu = (BEENES_INTF*)chip;
 
 	apu->options = flags;
 	apu->core.swap_duty = (flags & OPT_NES_DUTY_SWAP) ? 1 : 0;
 }
 
-void nesapu_2a03_set_mute_mask(void* chip, UINT32 mask)
+void beenes_intf_set_mute_mask(void* chip, UINT32 mask)
 {
-	NESAPU_2A03* apu = (NESAPU_2A03*)chip;
+	BEENES_INTF* apu = (BEENES_INTF*)chip;
 
 	apu->mute_mask = (UINT8)mask;
 }
 
-void nesapu_2a03_set_panning(void* chip, const INT16* pan)
+void beenes_intf_set_panning(void* chip, const INT16* pan)
 {
-	NESAPU_2A03* apu = (NESAPU_2A03*)chip;
+	BEENES_INTF* apu = (BEENES_INTF*)chip;
 	INT32 gains[2];
 	UINT8 chn;
 
@@ -275,37 +282,32 @@ void nesapu_2a03_set_panning(void* chip, const INT16* pan)
 	}
 }
 
-void nesapu_2a03_update(void* chip, UINT32 samples, DEV_SMPL** outputs)
+void beenes_intf_update(void* chip, UINT32 samples, DEV_SMPL** outputs)
 {
-	NESAPU_2A03* apu = (NESAPU_2A03*)chip;
-	SYNTH* s = &apu->synth;
-	UINT32 done = 0;
+	BEENES_INTF* apu = (BEENES_INTF*)chip;
+	short pcm[FRAME_SAMPLES];
+	UINT32 done;
+	UINT32 count;
+	UINT32 cycles;
+	UINT32 i;
+	UINT8 side;
 
-	while (done < samples)
+	for (done = 0; done < samples; done += count)
 	{
-		INT64 needed = ((INT64)(samples - done) << SYNTH_FRAC_BITS) - s->offset;
-		UINT32 cycles;
-		UINT32 count;
-		UINT32 i;
-		UINT8 chn;
-
-		/* The fewest cycles that complete the remaining samples, at most one block. */
-		if (needed > (INT64)CYCLE_SIZE * s->samples_per_cycle)
-			cycles = CYCLE_SIZE;
-		else
-			cycles = (UINT32)((needed + s->samples_per_cycle - 1) / s->samples_per_cycle);
+		count = samples - done;
+		if (count > FRAME_SAMPLES)
+			count = FRAME_SAMPLES;
+		/* Both buffers run at the same rates, so they need the same cycles. */
+		cycles = (UINT32)blip_clocks_needed(apu->blep[0], (int)count);
 		apu_run(apu, cycles);
-		count = synth_end_block(s, cycles);
-		if (count > samples - done)
-			count = samples - done;
-
-		for (chn = 0; chn < 2; chn ++)
+		for (side = 0; side < 2; side ++)
 		{
-			synth_read(s, chn, count, apu->block);
+			blip_end_frame(apu->blep[side], cycles);
+			blip_read_samples(apu->blep[side], pcm, (int)count, 0);
+			/* The console's output filters, back to the 0x8000 = level 1.0 scale of the output. */
 			for (i = 0; i < count; i ++)
-				outputs[chn][done + i] = (DEV_SMPL)(filter_consume(&apu->filter[chn], apu->block[i]) * 0x8000);
+				outputs[side][done + i] = (DEV_SMPL)(nes_output_filter(&apu->filter[side], (float)pcm[i]) *
+					(0x8000 / (float)LEVEL_ONE));
 		}
-		synth_consume(s, count);
-		done += count;
 	}
 }

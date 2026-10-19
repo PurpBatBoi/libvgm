@@ -20,8 +20,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#ifndef LSN_APU2A03_H
-#define LSN_APU2A03_H
+#ifndef BEENES_APU_H
+#define BEENES_APU_H
 
 #include <stddef.h>
 
@@ -32,68 +32,68 @@ extern "C" {
 #endif
 
 // APU Hardware Regions / Types
-typedef enum lsn_apu_type_e {
-    LSN_AT_NTSC                = 0,
-    LSN_AT_PAL                 = 1,
-    LSN_AT_DENDY               = 2,
-    LSN_AT_PALM                = 3,
-    LSN_AT_PALN                = 4,
-    LSN_AT_TOTAL               = 5
-} lsn_apu_type_t;
+typedef enum beenes_apu_type_e {
+    BEENES_AT_NTSC                = 0,
+    BEENES_AT_PAL                 = 1,
+    BEENES_AT_DENDY               = 2,
+    BEENES_AT_PALM                = 3,
+    BEENES_AT_PALN                = 4,
+    BEENES_AT_TOTAL               = 5
+} beenes_apu_type_t;
 
 // Frame counter clock event flags
-typedef enum lsn_frame_clocks_e {
-    LSN_FC_QUARTER             = (1 << 0), // Envelopes and linear counter
-    LSN_FC_HALF                = (1 << 1)  // Length counters and sweepers
-} lsn_frame_clocks_t;
+typedef enum beenes_frame_clocks_e {
+    BEENES_FC_QUARTER             = (1 << 0), // Envelopes and linear counter
+    BEENES_FC_HALF                = (1 << 1)  // Length counters and sweepers
+} beenes_frame_clocks_t;
 
 // Channel indices
-typedef enum lsn_channel_e {
-    LSN_C_PULSE_0              = 0,
-    LSN_C_PULSE_1              = 1,
-    LSN_C_TRIANGLE             = 2,
-    LSN_C_NOISE                = 3,
-    LSN_C_DMC                  = 4,
-    LSN_C_TOTAL                = 5
-} lsn_channel_t;
+typedef enum beenes_channel_e {
+    BEENES_C_PULSE_0              = 0,
+    BEENES_C_PULSE_1              = 1,
+    BEENES_C_TRIANGLE             = 2,
+    BEENES_C_NOISE                = 3,
+    BEENES_C_DMC                  = 4,
+    BEENES_C_TOTAL                = 5
+} beenes_channel_t;
 
 // --------------------------------------------------------------------------
 // Sub-unit structures
 // --------------------------------------------------------------------------
 
 // Envelope Generator
-typedef struct lsn_envelope_s {
+typedef struct beenes_envelope_s {
     UINT8                       output;
     UINT8                       decay_counter;
     UINT8                       divider_counter;
     UINT8                       volume;
     bool                        restart;
-} lsn_envelope_t;
+} beenes_envelope_t;
 
 // Length Counter
-typedef struct lsn_length_counter_s {
+typedef struct beenes_length_counter_s {
     UINT8                       counter;
-} lsn_length_counter_t;
+} beenes_length_counter_t;
 
 // Linear Counter (used by Triangle)
-typedef struct lsn_linear_counter_s {
+typedef struct beenes_linear_counter_s {
     UINT8                       linear_counter;
     UINT8                       linear_reload;
     bool                        reload_linear;
-} lsn_linear_counter_t;
+} beenes_linear_counter_t;
 
 // Sequencer (base unit for timer countdown and step sequences)
-typedef struct lsn_sequencer_s {
+typedef struct beenes_sequencer_s {
     UINT32                      sequence;
     UINT16                      timer;
     UINT16                      reload;
     UINT8                       out;
     UINT8                       seq_off;
     bool                        restart_seq;
-} lsn_sequencer_t;
+} beenes_sequencer_t;
 
 // Sweeper (frequency sweep unit for Pulse channels)
-typedef struct lsn_sweeper_s {
+typedef struct beenes_sweeper_s {
     UINT8                       shift;
     UINT8                       timer;
     UINT8                       period;
@@ -101,34 +101,34 @@ typedef struct lsn_sweeper_s {
     bool                        muted;
     bool                        negated;
     bool                        need_reload;
-} lsn_sweeper_t;
+} beenes_sweeper_t;
 
 // Pulse Channel (Pulse 1 or Pulse 2)
-typedef struct lsn_pulse_s {
-    lsn_length_counter_t        length;
-    lsn_envelope_t              envelope;
-    lsn_sequencer_t             sequencer;
-    lsn_sweeper_t               sweeper;
+typedef struct beenes_pulse_s {
+    beenes_length_counter_t        length;
+    beenes_envelope_t              envelope;
+    beenes_sequencer_t             sequencer;
+    beenes_sweeper_t               sweeper;
     UINT8                       ones_complement; // 1 for Pulse 1, 0 for Pulse 2
-} lsn_pulse_t;
+} beenes_pulse_t;
 
 // Triangle Channel
-typedef struct lsn_triangle_s {
-    lsn_length_counter_t        length;
-    lsn_linear_counter_t        linear;
-    lsn_sequencer_t             sequencer;
-} lsn_triangle_t;
+typedef struct beenes_triangle_s {
+    beenes_length_counter_t        length;
+    beenes_linear_counter_t        linear;
+    beenes_sequencer_t             sequencer;
+} beenes_triangle_t;
 
 // Noise Channel
-typedef struct lsn_noise_s {
-    lsn_length_counter_t        length;
-    lsn_envelope_t              envelope;
-    lsn_sequencer_t             sequencer;
+typedef struct beenes_noise_s {
+    beenes_length_counter_t        length;
+    beenes_envelope_t              envelope;
+    beenes_sequencer_t             sequencer;
     bool                        mode;            // false: 32767-step LFSR, true: 93-step LFSR
-} lsn_noise_t;
+} beenes_noise_t;
 
 // Delta Modulation Channel (DMC)
-typedef struct lsn_dmc_s {
+typedef struct beenes_dmc_s {
     UINT16                      sample_address;
     UINT16                      sample_length;
     UINT16                      current_address;
@@ -152,42 +152,42 @@ typedef struct lsn_dmc_s {
     bool                        set_implicit_abort;
     bool                        implicit_abort;
     bool                        clocked;
-} lsn_dmc_t;
+} beenes_dmc_t;
 
 // Pipeline Delayed Value Structure (models BeesNES CDelayedValue)
-typedef struct lsn_delayed_val_s {
+typedef struct beenes_delayed_val_s {
     UINT8                       buffer[8];
     UINT8                       is_write[8];
     size_t                      delay;
     size_t                      dirty;
     void                        (*callback)(void *user_data, UINT8 new_val, UINT8 old_val);
     void                        *user_data;
-} lsn_delayed_val_t;
+} beenes_delayed_val_t;
 
 // --------------------------------------------------------------------------
 // Main APU 2A03 structure
 // --------------------------------------------------------------------------
-typedef struct lsn_apu2a03_s {
+typedef struct beenes_apu_s {
     // Memory mapped registers $4000-$4017
     UINT8                       registers[0x18];
 
     // Sound channels
-    lsn_pulse_t                 pulse1;
-    lsn_pulse_t                 pulse2;
-    lsn_triangle_t              triangle;
-    lsn_noise_t                 noise;
-    lsn_dmc_t                   dmc;
+    beenes_pulse_t                 pulse1;
+    beenes_pulse_t                 pulse2;
+    beenes_triangle_t              triangle;
+    beenes_noise_t                 noise;
+    beenes_dmc_t                   dmc;
 
     // Pipeline delayed values
-    lsn_delayed_val_t           dv_4017;
-    lsn_delayed_val_t           dv_pulse1_length;
-    lsn_delayed_val_t           dv_pulse2_length;
-    lsn_delayed_val_t           dv_triangle_length;
-    lsn_delayed_val_t           dv_noise_length;
-    lsn_delayed_val_t           dv_pulse1_halt;
-    lsn_delayed_val_t           dv_pulse2_halt;
-    lsn_delayed_val_t           dv_triangle_halt;
-    lsn_delayed_val_t           dv_noise_halt;
+    beenes_delayed_val_t           dv_4017;
+    beenes_delayed_val_t           dv_pulse1_length;
+    beenes_delayed_val_t           dv_pulse2_length;
+    beenes_delayed_val_t           dv_triangle_length;
+    beenes_delayed_val_t           dv_noise_length;
+    beenes_delayed_val_t           dv_pulse1_halt;
+    beenes_delayed_val_t           dv_pulse2_halt;
+    beenes_delayed_val_t           dv_triangle_halt;
+    beenes_delayed_val_t           dv_noise_halt;
 
     // Cycle and timing counters
     UINT64                      cycles;
@@ -205,7 +205,7 @@ typedef struct lsn_apu2a03_s {
     bool                        frame_irq_flag;
 
     // Hardware configuration
-    lsn_apu_type_t              type;
+    beenes_apu_type_t              type;
     bool                        swap_duty;      // True for PAL-M / PAL-N
     bool                        letterless;     // True for earliest RP2A03 revision
 
@@ -213,39 +213,39 @@ typedef struct lsn_apu2a03_s {
     void                        *cb_user_data;
     UINT8                       (*cb_dma_read)(void *user_data, UINT16 addr);
 
-} lsn_apu2a03_t;
+} beenes_apu_t;
 
 // --------------------------------------------------------------------------
 // Public API Functions
 // --------------------------------------------------------------------------
 
 // Initialization & Reset
-void        lsn_apu2a03_init(lsn_apu2a03_t *apu, lsn_apu_type_t type);
-void        lsn_apu2a03_reset(lsn_apu2a03_t *apu);
-void        lsn_apu2a03_reset_analog(lsn_apu2a03_t *apu);
+void        beenes_apu_init(beenes_apu_t *apu, beenes_apu_type_t type);
+void        beenes_apu_reset(beenes_apu_t *apu);
+void        beenes_apu_reset_analog(beenes_apu_t *apu);
 
 // CPU Bus Interface
-void        lsn_apu2a03_write(lsn_apu2a03_t *apu, UINT16 addr, UINT8 val);
-UINT8       lsn_apu2a03_read(lsn_apu2a03_t *apu, UINT16 addr);
+void        beenes_apu_write(beenes_apu_t *apu, UINT16 addr, UINT8 val);
+UINT8       beenes_apu_read(beenes_apu_t *apu, UINT16 addr);
 
 // Cycle-by-cycle Execution
-void        lsn_apu2a03_tick(lsn_apu2a03_t *apu);
+void        beenes_apu_tick(beenes_apu_t *apu);
 
-// Output of each channel as the mixer sees it, indexed by lsn_channel_t: pulses, triangle and
+// Output of each channel as the mixer sees it, indexed by beenes_channel_t: pulses, triangle and
 // noise 0-15, DMC 0-127. A silenced channel reads 0.
-void        lsn_apu2a03_get_channel_levels(const lsn_apu2a03_t *apu, UINT8 levels[LSN_C_TOTAL]);
+void        beenes_apu_get_channel_levels(const beenes_apu_t *apu, UINT8 levels[BEENES_C_TOTAL]);
 
 // Configuration
 // The DMC fetches each sample byte through dma_read; without it the byte is never delivered.
-void        lsn_apu2a03_set_dma_read(
-                lsn_apu2a03_t *apu,
+void        beenes_apu_set_dma_read(
+                beenes_apu_t *apu,
                 void *user_data,
                 UINT8 (*dma_read)(void *user_data, UINT16 addr)
             );
-void        lsn_apu2a03_set_letterless(lsn_apu2a03_t *apu, bool letterless);
+void        beenes_apu_set_letterless(beenes_apu_t *apu, bool letterless);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* LSN_APU2A03_H */
+#endif /* BEENES_APU_H */
