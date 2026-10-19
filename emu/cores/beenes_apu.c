@@ -20,6 +20,9 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+// The APU (2A03 / 2A07 sound) of BeesNES, L-Spiro's sub-cycle-accurate NES emulator
+// (https://github.com/L-Spiro/BeesNES), ported to C for libvgm.
+
 #include "beenes_apu.h"
 #include <string.h>
 
