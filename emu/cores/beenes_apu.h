@@ -1,6 +1,6 @@
 // MIT License
 
-// Copyright (c) 2026 Purpbatboi
+// Copyright (c) 2026 L-Spiro
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -230,6 +230,12 @@ UINT8       beenes_apu_read(beenes_apu_t *apu, UINT16 addr);
 
 // Cycle-by-cycle Execution
 void        beenes_apu_tick(beenes_apu_t *apu);
+// Quiet cycles: cycles in which beenes_apu_tick() does not change the output (only sequencers of channels
+// that cannot be heard, or whose beenes_channel_t bit is in `ignore`, run out). beenes_apu_skip() runs up to
+// beenes_apu_quiet_cycles() of them at once; tick once with beenes_apu_tick() after it before reading or
+// writing the APU.
+UINT32      beenes_apu_quiet_cycles(const beenes_apu_t *apu, UINT8 ignore);
+void        beenes_apu_skip(beenes_apu_t *apu, UINT32 cycles);
 
 // Output of each channel as the mixer sees it, indexed by beenes_channel_t: pulses, triangle and
 // noise 0-15, DMC 0-127. A silenced channel reads 0.

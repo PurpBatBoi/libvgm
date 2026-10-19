@@ -1,7 +1,7 @@
 /*
 	MIT License
 
-	Copyright (c) 2026 Purpbatboi
+	Copyright (c) 2026 L-Spiro
 
 	Permission is hereby granted, free of charge, to any person obtaining a copy
 	of this software and associated documentation files (the "Software"), to deal
@@ -84,12 +84,21 @@ static void apu_start_core(BEENES_INTF* apu)
 	apu->core.swap_duty = (apu->options & OPT_NES_DUTY_SWAP) ? 1 : 0;
 }
 
+/* At the shortest periods the triangle is ultrasonic, and the console's low-pass leaves only the middle of
+	its wave: the mixer uses that level instead (and the APU need not step it for the output). */
+static UINT8 apu_triangle_ultrasonic(const BEENES_INTF* apu)
+{
+	const beenes_triangle_t* tri = &apu->core.triangle;
+
+	return ! (apu->mute_mask & 0x04) && tri->sequencer.reload < 2 && tri->length.counter > 0 &&
+		tri->linear.linear_counter > 0;
+}
+
 /* The five channels mixed, into out[0] (left) and out[1] (right). */
 static void apu_mix_level(const BEENES_INTF* apu, float* out)
 {
 	/* The linear approximation's gains, from the same wiki page. */
 	static const float LINEAR_GAIN[CHN_COUNT] = {0.00752f, 0.00752f, 0.00851f, 0.00494f, 0.00335f};
-	const beenes_triangle_t* tri = &apu->core.triangle;
 	UINT8 mute = apu->mute_mask;
 	UINT8 raw[CHN_COUNT];
 	float level[CHN_COUNT];
@@ -98,10 +107,7 @@ static void apu_mix_level(const BEENES_INTF* apu, float* out)
 	beenes_apu_get_channel_levels(&apu->core, raw);
 	for (chn = 0; chn < CHN_COUNT; chn ++)
 		level[chn] = (mute & (1 << chn)) ? 0.0f : (float)raw[chn];
-	/* At the shortest periods the triangle is ultrasonic, and the console's low-pass leaves only
-		the middle of its wave. Using that level also saves a step on nearly every cycle. */
-	if (! (mute & 0x04) && tri->sequencer.reload < 2 && tri->length.counter > 0 &&
-		tri->linear.linear_counter > 0)
+	if (apu_triangle_ultrasonic(apu))
 		level[BEENES_C_TRIANGLE] = 7.5f;
 
 	if (apu->options & OPT_NES_NONLINEAR_MIXER)
@@ -129,12 +135,29 @@ static void apu_mix_level(const BEENES_INTF* apu, float* out)
 static void apu_run(BEENES_INTF* apu, UINT32 cycles)
 {
 	UINT32 cycle;
+	UINT32 quiet;
 	float level[2];
 	INT32 value;
 	UINT8 side;
 
 	for (cycle = 0; cycle < cycles; cycle ++)
 	{
+		/* The cycles in which the output cannot change run at once. The first cycle of the frame is always
+			a real tick, which brings in the register writes since the last frame (the output can change with
+			them), and so is the last one, which leaves the state that the next writes see. */
+		if (cycle > 0)
+		{
+			/* the muted channels and the ultrasonic triangle are not heard */
+			quiet = beenes_apu_quiet_cycles(&apu->core, (UINT8)(apu->mute_mask |
+				(apu_triangle_ultrasonic(apu) ? 1 << BEENES_C_TRIANGLE : 0)));
+			if (quiet > cycles - 1 - cycle)
+				quiet = cycles - 1 - cycle;
+			if (quiet > 0)
+			{
+				beenes_apu_skip(&apu->core, quiet);
+				cycle += quiet;
+			}
+		}
 		beenes_apu_tick(&apu->core);
 		apu_mix_level(apu, level);
 		for (side = 0; side < 2; side ++)

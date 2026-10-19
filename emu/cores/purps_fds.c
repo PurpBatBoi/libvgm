@@ -185,25 +185,18 @@ static void apply_mod_entry(PURPS_FDS* fds, UINT8 entry)
 
 static void mod_tick(PURPS_FDS* fds)
 {
+	UINT32 low;
 	UINT8 carry;
 
 	/* $4083.7 also halts the mod table accumulator. */
 	if (fds->mod_halt || fds->wave_halt)
 		return;
-	if (fds->mod_force)
-	{
-		carry = 1;
-	}
-	else
-	{
-		UINT32 low;
-
-		if (fds->mod_freq == 0)
-			return;
-		low = (fds->mod_acc & 0xFFF) + fds->mod_freq;
-		carry = (low > 0xFFF) ? 1 : 0;
-		fds->mod_acc = (fds->mod_acc & ~(UINT32)0xFFF) | (low & 0xFFF);
-	}
+	/* The low 12 bits add the mod frequency every tick (with a frequency of 0 they stand still).
+		$4087.6 forces the carry out of bit 11, so the table steps every tick while the low
+		bits go on adding. */
+	low = (fds->mod_acc & 0xFFF) + fds->mod_freq;
+	carry = (low > 0xFFF || fds->mod_force) ? 1 : 0;
+	fds->mod_acc = (fds->mod_acc & ~(UINT32)0xFFF) | (low & 0xFFF);
 	if (carry)
 	{
 		/* The entry at the current address, then on to the next address bit. Bit 12 makes
@@ -215,7 +208,9 @@ static void mod_tick(PURPS_FDS* fds)
 
 static void wave_tick(PURPS_FDS* fds)
 {
-	if (fds->wave_halt)
+	/* $4023.1 = 0 halts the wavetable output where it is; setting it again resumes it. Unlike
+		$4083.7 it does not reset the accumulator. */
+	if (fds->wave_halt || ! (fds->io_enable & 0x02))
 		return;
 	fds->wave_acc = (fds->wave_acc + modulated_pitch(fds->pitch, fds->mod_counter, fds->mod_env.gain)) & 0xFFFFFF;
 }
@@ -345,14 +340,15 @@ void purps_fds_write(void* chip, UINT16 addr, UINT8 data)
 {
 	PURPS_FDS* fds = (PURPS_FDS*)chip;
 
+	/* Tests on the hardware found the sound registers still take writes with $4023.1 = 0
+		(https://forums.nesdev.org/viewtopic.php?p=305115). The effects seen after a longer
+		time with it clear (the volume shut off, the mod counter forced to 0, $4088 misbehaving)
+		are not measured well enough to emulate. */
 	if (addr == 0x4023)
 	{
 		fds->io_enable = data;
 		return;
 	}
-	/* The sound registers only work with $4023.1 set. */
-	if (! (fds->io_enable & 0x02))
-		return;
 
 	if (addr >= 0x4040 && addr <= 0x407F)
 	{

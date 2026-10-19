@@ -1,6 +1,6 @@
 // MIT License
 
-// Copyright (c) 2026 Purpbatboi
+// Copyright (c) 2026 L-Spiro
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -1175,6 +1175,171 @@ void beenes_apu_tick(beenes_apu_t *apu) {
     beenes_dmc_tick(apu);
 
     apu->cycles++;
+}
+
+static bool beenes_delayed_val_pending(const beenes_delayed_val_t *dv) {
+    return dv->delay != 0 && dv->dirty > 0;
+}
+
+// The channels whose level stays the same however their sequencer moves: the pulses and the noise when
+// they produce no sound for another reason than their sequencer output or their envelope is at 0, the
+// triangle when it produces no sound. Lengths, envelopes and linear counters change only on frame clocks.
+static UINT8 beenes_constant_channels(const beenes_apu_t *apu) {
+    UINT8 constant = 0;
+    const beenes_pulse_t *p;
+
+    p = &apu->pulse1;
+    if (!((apu->registers[0x15] & 0x01) && p->length.counter > 0 && p->sequencer.reload >= 8 && !p->sweeper.muted) ||
+        beenes_envelope_get_output(&p->envelope, (apu->registers[0x00] & 0x10) != 0) == 0) {
+        constant |= 1 << BEENES_C_PULSE_0;
+    }
+    p = &apu->pulse2;
+    if (!((apu->registers[0x15] & 0x02) && p->length.counter > 0 && p->sequencer.reload >= 8 && !p->sweeper.muted) ||
+        beenes_envelope_get_output(&p->envelope, (apu->registers[0x04] & 0x10) != 0) == 0) {
+        constant |= 1 << BEENES_C_PULSE_1;
+    }
+    if (!beenes_triangle_producing_sound(&apu->triangle, (apu->registers[0x15] & 0x04) != 0)) {
+        constant |= 1 << BEENES_C_TRIANGLE;
+    }
+    if (!((apu->registers[0x15] & 0x08) && apu->noise.length.counter > 0) ||
+        beenes_envelope_get_output(&apu->noise.envelope, (apu->registers[0x0C] & 0x10) != 0) == 0) {
+        constant |= 1 << BEENES_C_NOISE;
+    }
+    return constant;
+}
+
+// The next cycles that beenes_apu_tick() runs without changing the output: the frame counter takes no step,
+// the DMC timer does not run out, no delayed write lands, and only the sequencers of channels whose level
+// cannot change (or is in `ignore`, a mask of beenes_channel_t bits the caller does not hear) run out.
+// beenes_apu_skip() runs them at once.
+UINT32 beenes_apu_quiet_cycles(const beenes_apu_t *apu, UINT8 ignore) {
+    const beenes_frame_timings_t *t;
+    UINT64 next_step;
+    UINT64 quiet;
+    UINT64 limit;
+    UINT8 free_running;
+
+    if (apu->mode_switch || apu->frame_clock_wait || apu->dmc.start_delay || apu->dmc.enable_delay ||
+        apu->pulse1.sequencer.restart_seq || apu->pulse2.sequencer.restart_seq ||
+        apu->triangle.sequencer.restart_seq || apu->noise.sequencer.restart_seq) {
+        return 0;
+    }
+    if (beenes_delayed_val_pending(&apu->dv_4017) ||
+        beenes_delayed_val_pending(&apu->dv_pulse1_length) || beenes_delayed_val_pending(&apu->dv_pulse2_length) ||
+        beenes_delayed_val_pending(&apu->dv_triangle_length) || beenes_delayed_val_pending(&apu->dv_noise_length) ||
+        beenes_delayed_val_pending(&apu->dv_pulse1_halt) || beenes_delayed_val_pending(&apu->dv_pulse2_halt) ||
+        beenes_delayed_val_pending(&apu->dv_triangle_halt) || beenes_delayed_val_pending(&apu->dv_noise_halt)) {
+        return 0;
+    }
+
+    // Frame counter: the step_cycles value whose cycle does something. Each step acts when step_cycles
+    // reaches its end; the last step of the 4-step mode starts setting the IRQ flag at m0_s3_2 - 3 and the
+    // last step of the 5-step mode clocks the units at m1_s4_1 - 1, a cycle before their ends.
+    t = (apu->type == BEENES_AT_PAL) ? &beenes_timings_pal : &beenes_timings_ntsc;
+    if (apu->frame_mode == 0) {
+        switch (apu->frame_step) {
+            case 0: next_step = t->m0_s0; break;
+            case 1: next_step = t->m0_s1; break;
+            case 2: next_step = t->m0_s2; break;
+            default: next_step = t->m0_s3_2 - 2; break;
+        }
+    } else {
+        switch (apu->frame_step) {
+            case 0: next_step = t->m1_s0; break;
+            case 1: next_step = t->m1_s1; break;
+            case 2: next_step = t->m1_s2; break;
+            case 3: next_step = t->m1_s3; break;
+            default: next_step = t->m1_s4_1 - 1; break;
+        }
+    }
+    if (apu->step_cycles + 1 >= next_step) {
+        return 0;
+    }
+    quiet = next_step - 1 - apu->step_cycles;
+
+    // The DMC timer counts every cycle and runs out on the cycle after it reaches 0.
+    if (quiet > apu->dmc.timer) {
+        quiet = apu->dmc.timer;
+    }
+    // The sequencers of the channels that can be heard must not run out. The triangle timer counts every
+    // cycle; the pulse and noise timers on odd cycles only: n cycles from here hold (n + (cycles & 1)) / 2
+    // odd ones.
+    free_running = (UINT8)(beenes_constant_channels(apu) | ignore);
+    if (!(free_running & (1 << BEENES_C_TRIANGLE)) && quiet > apu->triangle.sequencer.timer) {
+        quiet = apu->triangle.sequencer.timer;
+    }
+    limit = 2 * (UINT64)apu->pulse1.sequencer.timer + 1 - (apu->cycles & 1);
+    if (!(free_running & (1 << BEENES_C_PULSE_0)) && quiet > limit) {
+        quiet = limit;
+    }
+    limit = 2 * (UINT64)apu->pulse2.sequencer.timer + 1 - (apu->cycles & 1);
+    if (!(free_running & (1 << BEENES_C_PULSE_1)) && quiet > limit) {
+        quiet = limit;
+    }
+    limit = 2 * (UINT64)apu->noise.sequencer.timer + 1 - (apu->cycles & 1);
+    if (!(free_running & (1 << BEENES_C_NOISE)) && quiet > limit) {
+        quiet = limit;
+    }
+    return (UINT32)quiet;
+}
+
+// `ticks` ticks of a sequencer timer: returns how often it ran out (and was reloaded).
+static UINT32 beenes_timer_run(beenes_sequencer_t *seq, UINT32 ticks) {
+    UINT32 period;
+    UINT32 rest;
+
+    if (ticks <= seq->timer) {
+        seq->timer = (UINT16)(seq->timer - ticks);
+        return 0;
+    }
+    period = (UINT32)seq->reload + 1;
+    rest = ticks - seq->timer - 1;  // the ticks after it first ran out
+    seq->timer = (UINT16)(seq->reload - rest % period);
+    return 1 + rest / period;
+}
+
+// The pulse sequencer after `steps` times its timer ran out: each one outputs the duty bit at seq_off, then
+// moves seq_off down by one (7 after 0).
+static void beenes_pulse_steps(beenes_pulse_t *p, UINT32 steps) {
+    if (steps) {
+        p->sequencer.out = (UINT8)((p->sequencer.sequence >> ((p->sequencer.seq_off - (steps - 1)) & 7)) & 1);
+        p->sequencer.seq_off = (UINT8)((p->sequencer.seq_off - steps) & 7);
+    }
+}
+
+// Runs `cycles` cycles that beenes_apu_quiet_cycles() reported, with every timer that runs out in them,
+// as beenes_apu_tick() would. The per-cycle flags (frame_clocks, ticks_to_len_cntr, the DMC's clocked and
+// implicit_abort) are left as they are: the caller ticks once more with beenes_apu_tick() before anything
+// reads them.
+void beenes_apu_skip(beenes_apu_t *apu, UINT32 cycles) {
+    UINT32 odd = (cycles + (UINT32)(apu->cycles & 1)) / 2;
+    UINT32 steps;
+    UINT32 bit0;
+    UINT32 other;
+    beenes_triangle_t *tri = &apu->triangle;
+    beenes_noise_t *n = &apu->noise;
+
+    beenes_pulse_steps(&apu->pulse1, beenes_timer_run(&apu->pulse1.sequencer, odd));
+    beenes_pulse_steps(&apu->pulse2, beenes_timer_run(&apu->pulse2.sequencer, odd));
+
+    // the triangle only steps while its length and linear counters are not 0
+    steps = beenes_timer_run(&tri->sequencer, cycles);
+    if (steps && tri->length.counter != 0 && tri->linear.linear_counter != 0) {
+        tri->sequencer.seq_off = (UINT8)((tri->sequencer.seq_off + steps) % 32);
+        tri->sequencer.out = beenes_triangle_table[tri->sequencer.seq_off];
+    }
+
+    // the noise shift register steps each time its timer runs out
+    for (steps = beenes_timer_run(&n->sequencer, odd); steps > 0; steps--) {
+        bit0 = n->sequencer.sequence & 1;
+        other = n->mode ? ((n->sequencer.sequence >> 6) & 1) : ((n->sequencer.sequence >> 1) & 1);
+        n->sequencer.sequence = ((bit0 ^ other) << 14) | ((n->sequencer.sequence & 0x7FFF) >> 1);
+        n->sequencer.out = (UINT8)((n->sequencer.sequence & 1) == 0);
+    }
+
+    apu->dmc.timer = (UINT16)(apu->dmc.timer - cycles);
+    apu->step_cycles += cycles;
+    apu->cycles += cycles;
 }
 
 void beenes_apu_get_channel_levels(const beenes_apu_t *apu, UINT8 levels[BEENES_C_TOTAL]) {
