@@ -1,6 +1,7 @@
 // MIT License
 
-// Copyright (c) 2026 L-Spiro
+// Copyright (c) 2020 Shawn (L. Spiro) Wilcoxen
+// Copyright (c) 2026 Purpbatboi (C port)
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -20,8 +21,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#ifndef BEENES_APU_H
-#define BEENES_APU_H
+#ifndef BEESNES_APU_H
+#define BEESNES_APU_H
 
 #include <stddef.h>
 
@@ -32,68 +33,68 @@ extern "C" {
 #endif
 
 // APU Hardware Regions / Types
-typedef enum beenes_apu_type_e {
-    BEENES_AT_NTSC                = 0,
-    BEENES_AT_PAL                 = 1,
-    BEENES_AT_DENDY               = 2,
-    BEENES_AT_PALM                = 3,
-    BEENES_AT_PALN                = 4,
-    BEENES_AT_TOTAL               = 5
-} beenes_apu_type_t;
+typedef enum beesnes_apu_type_e {
+    BEESNES_AT_NTSC                = 0,
+    BEESNES_AT_PAL                 = 1,
+    BEESNES_AT_DENDY               = 2,
+    BEESNES_AT_PALM                = 3,
+    BEESNES_AT_PALN                = 4,
+    BEESNES_AT_TOTAL               = 5
+} beesnes_apu_type_t;
 
 // Frame counter clock event flags
-typedef enum beenes_frame_clocks_e {
-    BEENES_FC_QUARTER             = (1 << 0), // Envelopes and linear counter
-    BEENES_FC_HALF                = (1 << 1)  // Length counters and sweepers
-} beenes_frame_clocks_t;
+typedef enum beesnes_frame_clocks_e {
+    BEESNES_FC_QUARTER             = (1 << 0), // Envelopes and linear counter
+    BEESNES_FC_HALF                = (1 << 1)  // Length counters and sweepers
+} beesnes_frame_clocks_t;
 
 // Channel indices
-typedef enum beenes_channel_e {
-    BEENES_C_PULSE_0              = 0,
-    BEENES_C_PULSE_1              = 1,
-    BEENES_C_TRIANGLE             = 2,
-    BEENES_C_NOISE                = 3,
-    BEENES_C_DMC                  = 4,
-    BEENES_C_TOTAL                = 5
-} beenes_channel_t;
+typedef enum beesnes_channel_e {
+    BEESNES_C_PULSE_0              = 0,
+    BEESNES_C_PULSE_1              = 1,
+    BEESNES_C_TRIANGLE             = 2,
+    BEESNES_C_NOISE                = 3,
+    BEESNES_C_DMC                  = 4,
+    BEESNES_C_TOTAL                = 5
+} beesnes_channel_t;
 
 // --------------------------------------------------------------------------
 // Sub-unit structures
 // --------------------------------------------------------------------------
 
 // Envelope Generator
-typedef struct beenes_envelope_s {
+typedef struct beesnes_envelope_s {
     UINT8                       output;
     UINT8                       decay_counter;
     UINT8                       divider_counter;
     UINT8                       volume;
     bool                        restart;
-} beenes_envelope_t;
+} beesnes_envelope_t;
 
 // Length Counter
-typedef struct beenes_length_counter_s {
+typedef struct beesnes_length_counter_s {
     UINT8                       counter;
-} beenes_length_counter_t;
+} beesnes_length_counter_t;
 
 // Linear Counter (used by Triangle)
-typedef struct beenes_linear_counter_s {
+typedef struct beesnes_linear_counter_s {
     UINT8                       linear_counter;
     UINT8                       linear_reload;
     bool                        reload_linear;
-} beenes_linear_counter_t;
+} beesnes_linear_counter_t;
 
 // Sequencer (base unit for timer countdown and step sequences)
-typedef struct beenes_sequencer_s {
+typedef struct beesnes_sequencer_s {
     UINT32                      sequence;
     UINT16                      timer;
     UINT16                      reload;
     UINT8                       out;
     UINT8                       seq_off;
     bool                        restart_seq;
-} beenes_sequencer_t;
+} beesnes_sequencer_t;
 
 // Sweeper (frequency sweep unit for Pulse channels)
-typedef struct beenes_sweeper_s {
+typedef struct beesnes_sweeper_s {
     UINT8                       shift;
     UINT8                       timer;
     UINT8                       period;
@@ -101,34 +102,34 @@ typedef struct beenes_sweeper_s {
     bool                        muted;
     bool                        negated;
     bool                        need_reload;
-} beenes_sweeper_t;
+} beesnes_sweeper_t;
 
 // Pulse Channel (Pulse 1 or Pulse 2)
-typedef struct beenes_pulse_s {
-    beenes_length_counter_t        length;
-    beenes_envelope_t              envelope;
-    beenes_sequencer_t             sequencer;
-    beenes_sweeper_t               sweeper;
+typedef struct beesnes_pulse_s {
+    beesnes_length_counter_t        length;
+    beesnes_envelope_t              envelope;
+    beesnes_sequencer_t             sequencer;
+    beesnes_sweeper_t               sweeper;
     UINT8                       ones_complement; // 1 for Pulse 1, 0 for Pulse 2
-} beenes_pulse_t;
+} beesnes_pulse_t;
 
 // Triangle Channel
-typedef struct beenes_triangle_s {
-    beenes_length_counter_t        length;
-    beenes_linear_counter_t        linear;
-    beenes_sequencer_t             sequencer;
-} beenes_triangle_t;
+typedef struct beesnes_triangle_s {
+    beesnes_length_counter_t        length;
+    beesnes_linear_counter_t        linear;
+    beesnes_sequencer_t             sequencer;
+} beesnes_triangle_t;
 
 // Noise Channel
-typedef struct beenes_noise_s {
-    beenes_length_counter_t        length;
-    beenes_envelope_t              envelope;
-    beenes_sequencer_t             sequencer;
+typedef struct beesnes_noise_s {
+    beesnes_length_counter_t        length;
+    beesnes_envelope_t              envelope;
+    beesnes_sequencer_t             sequencer;
     bool                        mode;            // false: 32767-step LFSR, true: 93-step LFSR
-} beenes_noise_t;
+} beesnes_noise_t;
 
 // Delta Modulation Channel (DMC)
-typedef struct beenes_dmc_s {
+typedef struct beesnes_dmc_s {
     UINT16                      sample_address;
     UINT16                      sample_length;
     UINT16                      current_address;
@@ -152,42 +153,42 @@ typedef struct beenes_dmc_s {
     bool                        set_implicit_abort;
     bool                        implicit_abort;
     bool                        clocked;
-} beenes_dmc_t;
+} beesnes_dmc_t;
 
 // Pipeline Delayed Value Structure (models BeesNES CDelayedValue)
-typedef struct beenes_delayed_val_s {
+typedef struct beesnes_delayed_val_s {
     UINT8                       buffer[8];
     UINT8                       is_write[8];
     size_t                      delay;
     size_t                      dirty;
     void                        (*callback)(void *user_data, UINT8 new_val, UINT8 old_val);
     void                        *user_data;
-} beenes_delayed_val_t;
+} beesnes_delayed_val_t;
 
 // --------------------------------------------------------------------------
 // Main APU 2A03 structure
 // --------------------------------------------------------------------------
-typedef struct beenes_apu_s {
+typedef struct beesnes_apu_s {
     // Memory mapped registers $4000-$4017
     UINT8                       registers[0x18];
 
     // Sound channels
-    beenes_pulse_t                 pulse1;
-    beenes_pulse_t                 pulse2;
-    beenes_triangle_t              triangle;
-    beenes_noise_t                 noise;
-    beenes_dmc_t                   dmc;
+    beesnes_pulse_t                 pulse1;
+    beesnes_pulse_t                 pulse2;
+    beesnes_triangle_t              triangle;
+    beesnes_noise_t                 noise;
+    beesnes_dmc_t                   dmc;
 
     // Pipeline delayed values
-    beenes_delayed_val_t           dv_4017;
-    beenes_delayed_val_t           dv_pulse1_length;
-    beenes_delayed_val_t           dv_pulse2_length;
-    beenes_delayed_val_t           dv_triangle_length;
-    beenes_delayed_val_t           dv_noise_length;
-    beenes_delayed_val_t           dv_pulse1_halt;
-    beenes_delayed_val_t           dv_pulse2_halt;
-    beenes_delayed_val_t           dv_triangle_halt;
-    beenes_delayed_val_t           dv_noise_halt;
+    beesnes_delayed_val_t           dv_4017;
+    beesnes_delayed_val_t           dv_pulse1_length;
+    beesnes_delayed_val_t           dv_pulse2_length;
+    beesnes_delayed_val_t           dv_triangle_length;
+    beesnes_delayed_val_t           dv_noise_length;
+    beesnes_delayed_val_t           dv_pulse1_halt;
+    beesnes_delayed_val_t           dv_pulse2_halt;
+    beesnes_delayed_val_t           dv_triangle_halt;
+    beesnes_delayed_val_t           dv_noise_halt;
 
     // Cycle and timing counters
     UINT64                      cycles;
@@ -205,7 +206,7 @@ typedef struct beenes_apu_s {
     bool                        frame_irq_flag;
 
     // Hardware configuration
-    beenes_apu_type_t              type;
+    beesnes_apu_type_t              type;
     bool                        swap_duty;      // True for PAL-M / PAL-N
     bool                        letterless;     // True for earliest RP2A03 revision
 
@@ -213,45 +214,45 @@ typedef struct beenes_apu_s {
     void                        *cb_user_data;
     UINT8                       (*cb_dma_read)(void *user_data, UINT16 addr);
 
-} beenes_apu_t;
+} beesnes_apu_t;
 
 // --------------------------------------------------------------------------
 // Public API Functions
 // --------------------------------------------------------------------------
 
 // Initialization & Reset
-void        beenes_apu_init(beenes_apu_t *apu, beenes_apu_type_t type);
-void        beenes_apu_reset(beenes_apu_t *apu);
-void        beenes_apu_reset_analog(beenes_apu_t *apu);
+void        beesnes_apu_init(beesnes_apu_t *apu, beesnes_apu_type_t type);
+void        beesnes_apu_reset(beesnes_apu_t *apu);
+void        beesnes_apu_reset_analog(beesnes_apu_t *apu);
 
 // CPU Bus Interface
-void        beenes_apu_write(beenes_apu_t *apu, UINT16 addr, UINT8 val);
-UINT8       beenes_apu_read(beenes_apu_t *apu, UINT16 addr);
+void        beesnes_apu_write(beesnes_apu_t *apu, UINT16 addr, UINT8 val);
+UINT8       beesnes_apu_read(beesnes_apu_t *apu, UINT16 addr);
 
 // Cycle-by-cycle Execution
-void        beenes_apu_tick(beenes_apu_t *apu);
-// Quiet cycles: cycles in which beenes_apu_tick() does not change the output (only sequencers of channels
-// that cannot be heard, or whose beenes_channel_t bit is in `ignore`, run out). beenes_apu_skip() runs up to
-// beenes_apu_quiet_cycles() of them at once; tick once with beenes_apu_tick() after it before reading or
+void        beesnes_apu_tick(beesnes_apu_t *apu);
+// Quiet cycles: cycles in which beesnes_apu_tick() does not change the output (only sequencers of channels
+// that cannot be heard, or whose beesnes_channel_t bit is in `ignore`, run out). beesnes_apu_skip() runs up to
+// beesnes_apu_quiet_cycles() of them at once; tick once with beesnes_apu_tick() after it before reading or
 // writing the APU.
-UINT32      beenes_apu_quiet_cycles(const beenes_apu_t *apu, UINT8 ignore);
-void        beenes_apu_skip(beenes_apu_t *apu, UINT32 cycles);
+UINT32      beesnes_apu_quiet_cycles(const beesnes_apu_t *apu, UINT8 ignore);
+void        beesnes_apu_skip(beesnes_apu_t *apu, UINT32 cycles);
 
-// Output of each channel as the mixer sees it, indexed by beenes_channel_t: pulses, triangle and
+// Output of each channel as the mixer sees it, indexed by beesnes_channel_t: pulses, triangle and
 // noise 0-15, DMC 0-127. A silenced channel reads 0.
-void        beenes_apu_get_channel_levels(const beenes_apu_t *apu, UINT8 levels[BEENES_C_TOTAL]);
+void        beesnes_apu_get_channel_levels(const beesnes_apu_t *apu, UINT8 levels[BEESNES_C_TOTAL]);
 
 // Configuration
 // The DMC fetches each sample byte through dma_read; without it the byte is never delivered.
-void        beenes_apu_set_dma_read(
-                beenes_apu_t *apu,
+void        beesnes_apu_set_dma_read(
+                beesnes_apu_t *apu,
                 void *user_data,
                 UINT8 (*dma_read)(void *user_data, UINT16 addr)
             );
-void        beenes_apu_set_letterless(beenes_apu_t *apu, bool letterless);
+void        beesnes_apu_set_letterless(beesnes_apu_t *apu, bool letterless);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* BEENES_APU_H */
+#endif /* BEESNES_APU_H */

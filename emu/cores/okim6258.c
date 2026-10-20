@@ -144,6 +144,8 @@ struct _okim6258_state
 	UINT8 data_buf[8];
 	UINT8 data_in_last;
 	UINT8 data_buf_pos;
+	// The 1st nibble of the last sample found no data in the queue (it may still arrive one sample late).
+	UINT8 data_late;
 	// Data Empty Values:
 	//	00 - data written, but not read yet
 	//	01 - read data, waiting for next write
@@ -279,8 +281,14 @@ static void okim6258_update(void *param, UINT32 samples, DEV_SMPL **outputs)
 			int nibble;
 			INT16 sample;
 			
-			if (! nibble_shift)
+			// A byte that arrives one sample after its 1st nibble was due is taken as if it was on time.
+			// (Without this, the 2nd nibble of the previous byte is decoded a second time: the step size
+			// jumps and the sound gets loud. Streamed data arrives with up to a sample of jitter.)
+			if (! nibble_shift || (chip->data_late && ! chip->data_empty))
 			{
+				if (chip->data_late)
+					nibble_shift = 0;
+				chip->data_late = 0;
 				// 1st nibble - get data
 				if (! chip->data_empty)
 				{
@@ -295,9 +303,14 @@ static void okim6258_update(void *param, UINT32 samples, DEV_SMPL **outputs)
 					//chip->data_in = chip->data_in_last;
 					if (chip->data_empty < 0x80)
 						chip->data_empty ++;
+					chip->data_late = 1;
 				}
 			}
-			nibble = (chip->data_in >> nibble_shift) & 0xf;
+			else
+			{
+				chip->data_late = 0;
+			}
+			nibble =(chip->data_in >> nibble_shift) & 0xf;
 
 			/* Output to the buffer */
 			//sample = clock_adpcm(chip, nibble);
@@ -426,6 +439,7 @@ static void device_reset_okim6258(void *chip)
 	info->data_buf[0] = info->data_buf[1] = 0x00;
 	info->data_buf_pos = 0x00;
 	info->data_empty = 0xFF;
+	info->data_late = 0x00;
 	info->pan = 0x00;
 }
 
@@ -550,6 +564,7 @@ static void okim6258_ctrl_w(void *chip, UINT8 data)
 			info->data_buf[0x00] = data;
 			info->data_buf_pos = 0x01;	// write pos 01, read pos 00
 			info->data_empty = 0x00;
+			info->data_late = 0x00;
 		}
 		info->step = 0;	// this line was verified with the source of XM6
 		info->nibble_shift = 0;

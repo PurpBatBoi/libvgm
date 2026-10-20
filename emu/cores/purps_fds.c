@@ -286,7 +286,7 @@ void* purps_fds_create(UINT32 clock, UINT32 rate)
 	}
 	blip_set_rates(fds->blep, clock, rate);
 	/* The wiki: "roughly 2.4x the maximum volume of the APU square". A square at volume 15
-		reaches 95.52 / (8128 / 15 + 100) on the APU's mixer scale (beenes_intf.c). */
+		reaches 95.52 / (8128 / 15 + 100) on the APU's mixer scale (beesnes_intf.c). */
 	fds->scale = 2.4f * (95.52f / (8128.0f / 15.0f + 100.0f)) / (63.0f * 32.0f);
 	fds->pan[0] = fds->pan[1] = 1.0f;
 	purps_fds_reset(fds);

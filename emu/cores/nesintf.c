@@ -12,57 +12,57 @@
 #include "nesintf.h"
 #include "../panning.h"
 
-#ifdef EC_NES_BEENES
-#include "beenes_intf.h"
+#ifdef EC_NES_BEESNES
+#include "beesnes_intf.h"
 #include "purps_fds.h"
 #endif
 
 
 typedef struct nesapu_info NESAPU_INF;
 
-static void nes_stream_update_beenes(void* chip, UINT32 samples, DEV_SMPL** outputs);
+static void nes_stream_update_beesnes(void* chip, UINT32 samples, DEV_SMPL** outputs);
 
-static UINT8 device_start_nes_beenes(const DEV_GEN_CFG* cfg, DEV_INFO* retDevInf);
-static void device_stop_nes_beenes(void* chip);
+static UINT8 device_start_nes_beesnes(const DEV_GEN_CFG* cfg, DEV_INFO* retDevInf);
+static void device_stop_nes_beesnes(void* chip);
 static void device_stop_nes_common(NESAPU_INF* info);
-static void device_reset_nes_beenes(void* chip);
+static void device_reset_nes_beesnes(void* chip);
 
-static void nes_w_beenes(void* chip, UINT8 offset, UINT8 data);
-static UINT8 nes_r_beenes(void* chip, UINT8 offset);
+static void nes_w_beesnes(void* chip, UINT8 offset, UINT8 data);
+static UINT8 nes_r_beesnes(void* chip, UINT8 offset);
 static void nes_write_ram(void* chip, UINT32 offset, UINT32 length, const UINT8* data);
 
-static void nes_set_chip_option_beenes(void* chip, UINT32 NesOptions);
-static void nes_set_mute_mask_beenes(void* chip, UINT32 MuteMask);
-static void nes_set_pan_beenes(void* chip, const INT16* PanVals);
+static void nes_set_chip_option_beesnes(void* chip, UINT32 NesOptions);
+static void nes_set_mute_mask_beesnes(void* chip, UINT32 MuteMask);
+static void nes_set_pan_beesnes(void* chip, const INT16* PanVals);
 
 
-#ifdef EC_NES_BEENES
-static DEVDEF_RWFUNC devFunc_BeeNES[] =
+#ifdef EC_NES_BEESNES
+static DEVDEF_RWFUNC devFunc_BeesNES[] =
 {
-	{RWF_REGISTER | RWF_WRITE, DEVRW_A8D8, 0, nes_w_beenes},
-	{RWF_REGISTER | RWF_READ, DEVRW_A8D8, 0, nes_r_beenes},
+	{RWF_REGISTER | RWF_WRITE, DEVRW_A8D8, 0, nes_w_beesnes},
+	{RWF_REGISTER | RWF_READ, DEVRW_A8D8, 0, nes_r_beesnes},
 	{RWF_MEMORY | RWF_WRITE, DEVRW_BLOCK, 0, nes_write_ram},
-	{RWF_CHN_MUTE | RWF_WRITE, DEVRW_ALL, 0, nes_set_mute_mask_beenes},
-	{RWF_CHN_PAN | RWF_WRITE, DEVRW_ALL, 0, nes_set_pan_beenes},
+	{RWF_CHN_MUTE | RWF_WRITE, DEVRW_ALL, 0, nes_set_mute_mask_beesnes},
+	{RWF_CHN_PAN | RWF_WRITE, DEVRW_ALL, 0, nes_set_pan_beesnes},
 	{0x00, 0x00, 0, NULL}
 };
-static DEV_DEF devDef_BeeNES =
+static DEV_DEF devDef_BeesNES =
 {
-	"NES APU", "BeeNES", FCC_BNES,
+	"NES APU", "BeesNES", FCC_BNES,
 	
-	device_start_nes_beenes,
-	device_stop_nes_beenes,
-	device_reset_nes_beenes,
-	nes_stream_update_beenes,
+	device_start_nes_beesnes,
+	device_stop_nes_beesnes,
+	device_reset_nes_beesnes,
+	nes_stream_update_beesnes,
 	
-	nes_set_chip_option_beenes,	// SetOptionBits
-	nes_set_mute_mask_beenes,
-	nes_set_pan_beenes,
+	nes_set_chip_option_beesnes,	// SetOptionBits
+	nes_set_mute_mask_beesnes,
+	nes_set_pan_beesnes,
 	NULL,	// SetSampleRateChangeCallback
 	NULL,	// SetLoggingCallback
 	NULL,	// LinkDevice
 	
-	devFunc_BeeNES,	// rwFuncs
+	devFunc_BeesNES,	// rwFuncs
 };
 #endif
 
@@ -110,8 +110,8 @@ const DEV_DECL sndDev_NES_APU =
 	DeviceChannelNames,
 	DeviceLinkIDs,
 	{	// cores
-#ifdef EC_NES_BEENES
-		&devDef_BeeNES,
+#ifdef EC_NES_BEESNES
+		&devDef_BeesNES,
 #endif
 		NULL
 	}
@@ -137,12 +137,12 @@ struct nesapu_info
 
 
 
-#ifdef EC_NES_BEENES
-static void nes_stream_update_beenes(void* chip, UINT32 samples, DEV_SMPL** outputs)
+#ifdef EC_NES_BEESNES
+static void nes_stream_update_beesnes(void* chip, UINT32 samples, DEV_SMPL** outputs)
 {
 	NESAPU_INF* info = (NESAPU_INF*)chip;
 	
-	beenes_intf_update(info->chip_apu, samples, outputs);
+	beesnes_intf_update(info->chip_apu, samples, outputs);
 	if (info->chip_fds != NULL)
 		purps_fds_update(info->chip_fds, samples, outputs);
 	
@@ -153,8 +153,8 @@ static void nes_stream_update_beenes(void* chip, UINT32 samples, DEV_SMPL** outp
 
 
 
-#ifdef EC_NES_BEENES
-static UINT8 device_start_nes_beenes(const DEV_GEN_CFG* cfg, DEV_INFO* retDevInf)
+#ifdef EC_NES_BEESNES
+static UINT8 device_start_nes_beesnes(const DEV_GEN_CFG* cfg, DEV_INFO* retDevInf)
 {
 	NESAPU_INF* info;
 	UINT32 rate;
@@ -168,7 +168,7 @@ static UINT8 device_start_nes_beenes(const DEV_GEN_CFG* cfg, DEV_INFO* retDevInf
 	info = (NESAPU_INF*)calloc(1, sizeof(NESAPU_INF));
 	if (info == NULL)
 		return 0xFF;
-	info->chip_apu = beenes_intf_create(cfg->clock, rate);
+	info->chip_apu = beesnes_intf_create(cfg->clock, rate);
 	if (info->chip_apu == NULL)
 	{
 		free(info);
@@ -176,7 +176,7 @@ static UINT8 device_start_nes_beenes(const DEV_GEN_CFG* cfg, DEV_INFO* retDevInf
 	}
 	info->chip_dmc = NULL;
 	
-	// The BeeNES core has no FDS, so it comes with its own, written from the nesdev wiki.
+	// The BeesNES core has no FDS, so it comes with its own, written from the nesdev wiki.
 	if (cfg->flags)	// enable FDS sound
 		info->chip_fds = purps_fds_create(cfg->clock, rate);
 	else
@@ -184,24 +184,24 @@ static UINT8 device_start_nes_beenes(const DEV_GEN_CFG* cfg, DEV_INFO* retDevInf
 	
 	info->memory = (UINT8*)malloc(0x8000);
 	memset(info->memory, 0x00, 0x8000);
-	beenes_intf_set_memory(info->chip_apu, info->memory);
+	beesnes_intf_set_memory(info->chip_apu, info->memory);
 	
 	info->fds_disable = 0;
 	
 	info->_devData.chipInf = info;
-	INIT_DEVINF(retDevInf, &info->_devData, rate, &devDef_BeeNES);
+	INIT_DEVINF(retDevInf, &info->_devData, rate, &devDef_BeesNES);
 	return 0x00;
 }
 #endif
 
 
 
-#ifdef EC_NES_BEENES
-static void device_stop_nes_beenes(void* chip)
+#ifdef EC_NES_BEESNES
+static void device_stop_nes_beesnes(void* chip)
 {
 	NESAPU_INF* info = (NESAPU_INF*)chip;
 	
-	beenes_intf_destroy(info->chip_apu);
+	beesnes_intf_destroy(info->chip_apu);
 	if (info->chip_fds != NULL)
 		purps_fds_destroy(info->chip_fds);
 	info->chip_fds = NULL;	// already freed, not NSFPlay's
@@ -222,12 +222,12 @@ static void device_stop_nes_common(NESAPU_INF* info)
 
 
 
-#ifdef EC_NES_BEENES
-static void device_reset_nes_beenes(void* chip)
+#ifdef EC_NES_BEESNES
+static void device_reset_nes_beesnes(void* chip)
 {
 	NESAPU_INF* info = (NESAPU_INF*)chip;
 	
-	beenes_intf_reset(info->chip_apu);
+	beesnes_intf_reset(info->chip_apu);
 	if (info->chip_fds != NULL)
 		purps_fds_reset(info->chip_fds);
 	
@@ -238,14 +238,14 @@ static void device_reset_nes_beenes(void* chip)
 
 
 
-#ifdef EC_NES_BEENES
-static void nes_w_beenes(void* chip, UINT8 offset, UINT8 data)
+#ifdef EC_NES_BEESNES
+static void nes_w_beesnes(void* chip, UINT8 offset, UINT8 data)
 {
 	NESAPU_INF* info = (NESAPU_INF*)chip;
 	
 	if (offset < 0x20)	// NES APU
 	{
-		beenes_intf_write(info->chip_apu, offset, data);
+		beesnes_intf_write(info->chip_apu, offset, data);
 	}
 	else	// FDS
 	{
@@ -255,13 +255,13 @@ static void nes_w_beenes(void* chip, UINT8 offset, UINT8 data)
 	return;
 }
 
-static UINT8 nes_r_beenes(void* chip, UINT8 offset)
+static UINT8 nes_r_beesnes(void* chip, UINT8 offset)
 {
 	NESAPU_INF* info = (NESAPU_INF*)chip;
 	
 	if (offset < 0x20)	// NES APU
 	{
-		return beenes_intf_read(info->chip_apu, offset);
+		return beesnes_intf_read(info->chip_apu, offset);
 	}
 	else	// FDS
 	{
@@ -316,12 +316,12 @@ static void nes_write_ram(void* chip, UINT32 offset, UINT32 length, const UINT8*
 
 
 
-#ifdef EC_NES_BEENES
-static void nes_set_chip_option_beenes(void* chip, UINT32 NesOptions)
+#ifdef EC_NES_BEESNES
+static void nes_set_chip_option_beesnes(void* chip, UINT32 NesOptions)
 {
 	NESAPU_INF* info = (NESAPU_INF*)chip;
 	
-	beenes_intf_set_options(info->chip_apu, NesOptions);
+	beesnes_intf_set_options(info->chip_apu, NesOptions);
 	if (info->chip_fds != NULL)
 		purps_fds_set_options(info->chip_fds, NesOptions);
 	info->fds_disable = (NesOptions & OPT_NES_FDS_DISABLE) ? 1 : 0;
@@ -333,23 +333,23 @@ static void nes_set_chip_option_beenes(void* chip, UINT32 NesOptions)
 
 
 
-#ifdef EC_NES_BEENES
-static void nes_set_mute_mask_beenes(void* chip, UINT32 MuteMask)
+#ifdef EC_NES_BEESNES
+static void nes_set_mute_mask_beesnes(void* chip, UINT32 MuteMask)
 {
 	NESAPU_INF* info = (NESAPU_INF*)chip;
 	
-	beenes_intf_set_mute_mask(info->chip_apu, MuteMask & 0x1F);
+	beesnes_intf_set_mute_mask(info->chip_apu, MuteMask & 0x1F);
 	if (info->chip_fds != NULL)
 		purps_fds_set_mute(info->chip_fds, (MuteMask & 0x20) ? 1 : 0);
 	
 	return;
 }
 
-static void nes_set_pan_beenes(void* chip, const INT16* PanVals)
+static void nes_set_pan_beesnes(void* chip, const INT16* PanVals)
 {
 	NESAPU_INF* info = (NESAPU_INF*)chip;
 	
-	beenes_intf_set_panning(info->chip_apu, PanVals);
+	beesnes_intf_set_panning(info->chip_apu, PanVals);
 	if (info->chip_fds != NULL)
 		purps_fds_set_panning(info->chip_fds, PanVals[5]);
 	

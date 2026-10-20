@@ -4,7 +4,7 @@
 #include "../../stdtype.h"
 #include "../EmuStructs.h"
 
-/* Famicom Disk System sound, the FDS half of the BeeNES NES core. See purps_fds.c. */
+/* Famicom Disk System sound, the FDS half of the BeesNES NES core. See purps_fds.c. */
 
 /* Creates an FDS sound unit clocked at `clock` Hz (the CPU clock) that renders at `rate` Hz. */
 void* purps_fds_create(UINT32 clock, UINT32 rate);

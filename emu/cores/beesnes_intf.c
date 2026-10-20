@@ -1,7 +1,8 @@
 /*
 	MIT License
 
-	Copyright (c) 2026 L-Spiro
+	Copyright (c) 2020 Shawn (L. Spiro) Wilcoxen
+	Copyright (c) 2026 Purpbatboi (C port)
 
 	Permission is hereby granted, free of charge, to any person obtaining a copy
 	of this software and associated documentation files (the "Software"), to deal
@@ -30,11 +31,11 @@
 #include "../panning.h"
 #include "../../libs/blep_filter/blep_filter.h"
 #include "nesintf.h"
-#include "beenes_intf.h"
+#include "beesnes_intf.h"
 #include "nes_filter.h"
-#include "beenes_apu.h"
+#include "beesnes_apu.h"
 
-#define CHN_COUNT	BEENES_C_TOTAL
+#define CHN_COUNT	BEESNES_C_TOTAL
 
 /* Output samples rendered as one band-limited frame at most. */
 #define FRAME_SAMPLES	1024
@@ -42,12 +43,12 @@
 	is this, which leaves room for the overshoot of the band-limited steps below 32767. */
 #define LEVEL_ONE	0x4000
 
-typedef struct beenes_intf
+typedef struct beesnes_intf
 {
 	UINT32 sample_rate;
 	UINT8 pal;
 
-	beenes_apu_t core;
+	beesnes_apu_t core;
 
 	/* One band-limited buffer per side, with the integer level last added to it. */
 	blip_t* blep[2];
@@ -65,37 +66,37 @@ typedef struct beenes_intf
 	/* The console's non-linear mixer, from https://www.nesdev.org/wiki/APU_Mixer */
 	float pulse_table[31];
 	float tnd_table[203];
-} BEENES_INTF;
+} BEESNES_INTF;
 
 static UINT8 apu_dma_read(void* user_data, UINT16 addr)
 {
-	const BEENES_INTF* apu = (const BEENES_INTF*)user_data;
+	const BEESNES_INTF* apu = (const BEESNES_INTF*)user_data;
 
 	return (apu->memory != NULL && addr >= 0x8000) ? apu->memory[addr - 0x8000] : 0x00;
 }
 
 /* Powers the APU core up from scratch. */
-static void apu_start_core(BEENES_INTF* apu)
+static void apu_start_core(BEESNES_INTF* apu)
 {
-	beenes_apu_init(&apu->core, apu->pal ? BEENES_AT_PAL : BEENES_AT_NTSC);
+	beesnes_apu_init(&apu->core, apu->pal ? BEESNES_AT_PAL : BEESNES_AT_NTSC);
 	/* The core fetches each DPCM byte through dma_read. */
-	beenes_apu_set_dma_read(&apu->core, apu, apu_dma_read);
+	beesnes_apu_set_dma_read(&apu->core, apu, apu_dma_read);
 	/* Famiclone duty order: 25% and 50% swapped. */
 	apu->core.swap_duty = (apu->options & OPT_NES_DUTY_SWAP) ? 1 : 0;
 }
 
 /* At the shortest periods the triangle is ultrasonic, and the console's low-pass leaves only the middle of
 	its wave: the mixer uses that level instead (and the APU need not step it for the output). */
-static UINT8 apu_triangle_ultrasonic(const BEENES_INTF* apu)
+static UINT8 apu_triangle_ultrasonic(const BEESNES_INTF* apu)
 {
-	const beenes_triangle_t* tri = &apu->core.triangle;
+	const beesnes_triangle_t* tri = &apu->core.triangle;
 
 	return ! (apu->mute_mask & 0x04) && tri->sequencer.reload < 2 && tri->length.counter > 0 &&
 		tri->linear.linear_counter > 0;
 }
 
 /* The five channels mixed, into out[0] (left) and out[1] (right). */
-static void apu_mix_level(const BEENES_INTF* apu, float* out)
+static void apu_mix_level(const BEESNES_INTF* apu, float* out)
 {
 	/* The linear approximation's gains, from the same wiki page. */
 	static const float LINEAR_GAIN[CHN_COUNT] = {0.00752f, 0.00752f, 0.00851f, 0.00494f, 0.00335f};
@@ -104,18 +105,18 @@ static void apu_mix_level(const BEENES_INTF* apu, float* out)
 	float level[CHN_COUNT];
 	UINT8 chn;
 
-	beenes_apu_get_channel_levels(&apu->core, raw);
+	beesnes_apu_get_channel_levels(&apu->core, raw);
 	for (chn = 0; chn < CHN_COUNT; chn ++)
 		level[chn] = (mute & (1 << chn)) ? 0.0f : (float)raw[chn];
 	if (apu_triangle_ultrasonic(apu))
-		level[BEENES_C_TRIANGLE] = 7.5f;
+		level[BEESNES_C_TRIANGLE] = 7.5f;
 
 	if (apu->options & OPT_NES_NONLINEAR_MIXER)
 	{
-		UINT32 tnd = (UINT32)(3.0f * level[BEENES_C_TRIANGLE] + 2.0f * level[BEENES_C_NOISE] +
-			level[BEENES_C_DMC]);
+		UINT32 tnd = (UINT32)(3.0f * level[BEESNES_C_TRIANGLE] + 2.0f * level[BEESNES_C_NOISE] +
+			level[BEESNES_C_DMC]);
 
-		out[0] = apu->pulse_table[(UINT32)(level[BEENES_C_PULSE_0] + level[BEENES_C_PULSE_1])] +
+		out[0] = apu->pulse_table[(UINT32)(level[BEESNES_C_PULSE_0] + level[BEESNES_C_PULSE_1])] +
 			apu->tnd_table[tnd];
 		out[1] = out[0];
 	}
@@ -132,7 +133,7 @@ static void apu_mix_level(const BEENES_INTF* apu, float* out)
 }
 
 /* Clocks the core `cycles` times, adding each change of the mixed level as a band-limited step. */
-static void apu_run(BEENES_INTF* apu, UINT32 cycles)
+static void apu_run(BEESNES_INTF* apu, UINT32 cycles)
 {
 	UINT32 cycle;
 	UINT32 quiet;
@@ -148,17 +149,17 @@ static void apu_run(BEENES_INTF* apu, UINT32 cycles)
 		if (cycle > 0)
 		{
 			/* the muted channels and the ultrasonic triangle are not heard */
-			quiet = beenes_apu_quiet_cycles(&apu->core, (UINT8)(apu->mute_mask |
-				(apu_triangle_ultrasonic(apu) ? 1 << BEENES_C_TRIANGLE : 0)));
+			quiet = beesnes_apu_quiet_cycles(&apu->core, (UINT8)(apu->mute_mask |
+				(apu_triangle_ultrasonic(apu) ? 1 << BEESNES_C_TRIANGLE : 0)));
 			if (quiet > cycles - 1 - cycle)
 				quiet = cycles - 1 - cycle;
 			if (quiet > 0)
 			{
-				beenes_apu_skip(&apu->core, quiet);
+				beesnes_apu_skip(&apu->core, quiet);
 				cycle += quiet;
 			}
 		}
-		beenes_apu_tick(&apu->core);
+		beesnes_apu_tick(&apu->core);
 		apu_mix_level(apu, level);
 		for (side = 0; side < 2; side ++)
 		{
@@ -172,14 +173,14 @@ static void apu_run(BEENES_INTF* apu, UINT32 cycles)
 	}
 }
 
-void* beenes_intf_create(UINT32 clock, UINT32 rate)
+void* beesnes_intf_create(UINT32 clock, UINT32 rate)
 {
-	BEENES_INTF* apu;
+	BEESNES_INTF* apu;
 	int i;
 
 	if (clock == 0 || rate == 0 || rate > clock / 4)
 		return NULL;
-	apu = (BEENES_INTF*)calloc(1, sizeof(BEENES_INTF));
+	apu = (BEESNES_INTF*)calloc(1, sizeof(BEESNES_INTF));
 	if (apu == NULL)
 		return NULL;
 	apu->sample_rate = rate;
@@ -191,7 +192,7 @@ void* beenes_intf_create(UINT32 clock, UINT32 rate)
 		apu->blep[i] = blip_new(FRAME_SAMPLES);
 		if (apu->blep[i] == NULL)
 		{
-			beenes_intf_destroy(apu);
+			beesnes_intf_destroy(apu);
 			return NULL;
 		}
 		blip_set_rates(apu->blep[i], clock, rate);
@@ -207,41 +208,45 @@ void* beenes_intf_create(UINT32 clock, UINT32 rate)
 	apu->options = OPT_NES_UNMUTE_ON_RESET | OPT_NES_NONLINEAR_MIXER | OPT_NES_ENABLE_4011 |
 		OPT_NES_ENABLE_PNOISE;
 
-	beenes_intf_reset(apu);
+	beesnes_intf_reset(apu);
 	return apu;
 }
 
-void beenes_intf_destroy(void* chip)
+void beesnes_intf_destroy(void* chip)
 {
-	BEENES_INTF* apu = (BEENES_INTF*)chip;
+	BEESNES_INTF* apu = (BEESNES_INTF*)chip;
 
 	blip_delete(apu->blep[0]);
 	blip_delete(apu->blep[1]);
 	free(apu);
 }
 
-void beenes_intf_reset(void* chip)
+void beesnes_intf_reset(void* chip)
 {
-	BEENES_INTF* apu = (BEENES_INTF*)chip;
+	BEESNES_INTF* apu = (BEESNES_INTF*)chip;
+	float level[2];
 	UINT8 side;
 
 	apu_start_core(apu);
-	for (side = 0; side < 2; side ++)
-	{
-		blip_clear(apu->blep[side]);
-		apu->blep_level[side] = 0;
-		nes_output_filter_init(&apu->filter[side], (float)apu->sample_rate);
-	}
-
 	/* Some VGMs were logged without the driver's $4015 write, and only play with the pulse,
 		triangle and noise channels enabled from the start. */
 	if (apu->options & OPT_NES_UNMUTE_ON_RESET)
-		beenes_intf_write(apu, 0x15, 0x0F);
+		beesnes_intf_write(apu, 0x15, 0x0F);
+
+	/* The triangle starts at a level other than 0 (it holds its last value): begin there, so the
+		start of the song does not have a step. */
+	apu_mix_level(apu, level);
+	for (side = 0; side < 2; side ++)
+	{
+		blip_clear(apu->blep[side]);
+		apu->blep_level[side] = (INT32)(level[side] * LEVEL_ONE + 0.5f);
+		nes_output_filter_init(&apu->filter[side], (float)apu->sample_rate);
+	}
 }
 
-void beenes_intf_write(void* chip, UINT8 offset, UINT8 data)
+void beesnes_intf_write(void* chip, UINT8 offset, UINT8 data)
 {
-	BEENES_INTF* apu = (BEENES_INTF*)chip;
+	BEESNES_INTF* apu = (BEESNES_INTF*)chip;
 
 	switch(offset)
 	{
@@ -255,19 +260,19 @@ void beenes_intf_write(void* chip, UINT8 offset, UINT8 data)
 			return;
 		break;
 	}
-	beenes_apu_write(&apu->core, (UINT16)(0x4000 | offset), data);
+	beesnes_apu_write(&apu->core, (UINT16)(0x4000 | offset), data);
 }
 
-UINT8 beenes_intf_read(void* chip, UINT8 offset)
+UINT8 beesnes_intf_read(void* chip, UINT8 offset)
 {
-	BEENES_INTF* apu = (BEENES_INTF*)chip;
+	BEESNES_INTF* apu = (BEESNES_INTF*)chip;
 
-	return beenes_apu_read(&apu->core, (UINT16)(0x4000 | offset));
+	return beesnes_apu_read(&apu->core, (UINT16)(0x4000 | offset));
 }
 
-void beenes_intf_set_memory(void* chip, const UINT8* memory)
+void beesnes_intf_set_memory(void* chip, const UINT8* memory)
 {
-	BEENES_INTF* apu = (BEENES_INTF*)chip;
+	BEESNES_INTF* apu = (BEESNES_INTF*)chip;
 
 	apu->memory = memory;
 }
@@ -276,24 +281,24 @@ void beenes_intf_set_memory(void* chip, const UINT8* memory)
 	next reset. The others (PHASE_REFRESH, DPCM_ANTI_CLICK, RANDOMIZE_NOISE, TRI_MUTE, TRI_NULL)
 	tune the MAME and NSFPlay cores' approximations of behavior this core emulates as the
 	hardware does. */
-void beenes_intf_set_options(void* chip, UINT32 flags)
+void beesnes_intf_set_options(void* chip, UINT32 flags)
 {
-	BEENES_INTF* apu = (BEENES_INTF*)chip;
+	BEESNES_INTF* apu = (BEESNES_INTF*)chip;
 
 	apu->options = flags;
 	apu->core.swap_duty = (flags & OPT_NES_DUTY_SWAP) ? 1 : 0;
 }
 
-void beenes_intf_set_mute_mask(void* chip, UINT32 mask)
+void beesnes_intf_set_mute_mask(void* chip, UINT32 mask)
 {
-	BEENES_INTF* apu = (BEENES_INTF*)chip;
+	BEESNES_INTF* apu = (BEESNES_INTF*)chip;
 
 	apu->mute_mask = (UINT8)mask;
 }
 
-void beenes_intf_set_panning(void* chip, const INT16* pan)
+void beesnes_intf_set_panning(void* chip, const INT16* pan)
 {
-	BEENES_INTF* apu = (BEENES_INTF*)chip;
+	BEESNES_INTF* apu = (BEESNES_INTF*)chip;
 	INT32 gains[2];
 	UINT8 chn;
 
@@ -305,9 +310,9 @@ void beenes_intf_set_panning(void* chip, const INT16* pan)
 	}
 }
 
-void beenes_intf_update(void* chip, UINT32 samples, DEV_SMPL** outputs)
+void beesnes_intf_update(void* chip, UINT32 samples, DEV_SMPL** outputs)
 {
-	BEENES_INTF* apu = (BEENES_INTF*)chip;
+	BEESNES_INTF* apu = (BEESNES_INTF*)chip;
 	short pcm[FRAME_SAMPLES];
 	UINT32 done;
 	UINT32 count;

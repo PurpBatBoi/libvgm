@@ -29,9 +29,11 @@
 
 #include "../../stdtype.h"
 
-/* Output filters of the NES / Famicom, shared by the BeeNES APU (beenes_intf.c) and the FDS (purps_fds.c).
-	https://www.nesdev.org/wiki/APU_Mixer: the console's output goes through a first-order high-pass at
-	90 Hz, a first-order high-pass at 440 Hz and a first-order low-pass at 14 kHz.
+/* Output filters of the NES / Famicom, shared by the BeesNES APU (beesnes_intf.c) and the FDS (purps_fds.c).
+	https://www.nesdev.org/wiki/APU_Mixer: the Famicom specifies a first-order high-pass at 37 Hz. The NES
+	adds a second high-pass at 440 Hz and its first one is at 90 Hz; those two are not used here, because they
+	take 5 to 19 dB off everything below 440 Hz (thin bass, quiet DPCM, sharper triangle clicks).
+	The first-order low-pass at 14 kHz is the NES's, kept to round off the steps near the Nyquist frequency.
 	https://www.nesdev.org/wiki/FDS_audio: the FDS output has its own low-pass of about 2 kHz.
 	Each one is an RC stage, discretized at the output sample rate. */
 
@@ -55,8 +57,7 @@ typedef struct
 /* The console's chain, in the order the signal goes through it */
 typedef struct
 {
-	NES_HIGH_PASS hp_90;
-	NES_HIGH_PASS hp_440;
+	NES_HIGH_PASS hp_37;
 	NES_LOW_PASS lp_14k;
 } NES_OUTPUT_FILTER;
 
@@ -97,14 +98,13 @@ static float nes_high_pass(NES_HIGH_PASS* f, float x)
 
 static void nes_output_filter_init(NES_OUTPUT_FILTER* f, float sample_rate)
 {
-	nes_high_pass_init(&f->hp_90, sample_rate, 90.0f);
-	nes_high_pass_init(&f->hp_440, sample_rate, 440.0f);
+	nes_high_pass_init(&f->hp_37, sample_rate, 37.0f);
 	nes_low_pass_init(&f->lp_14k, sample_rate, 14000.0f);
 }
 
 static float nes_output_filter(NES_OUTPUT_FILTER* f, float x)
 {
-	return nes_low_pass(&f->lp_14k, nes_high_pass(&f->hp_440, nes_high_pass(&f->hp_90, x)));
+	return nes_low_pass(&f->lp_14k, nes_high_pass(&f->hp_37, x));
 }
 
 #endif	/* __NES_FILTER_H__ */
