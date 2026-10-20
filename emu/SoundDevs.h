@@ -49,6 +49,7 @@
 #define DEVID_MSM5232	0x2D
 #define DEVID_BSMT2000	0x2E
 #define DEVID_ICS2115	0x2F
+#define DEVID_SNES_APU	0x30	// SNES audio unit (SPC700 + S-DSP), played from .spc files only
 #define DEVID_YM2414	0x81	// YM2414 (OPZ), used in TX81Z
 
 #endif	// __SOUNDDEVS_H__

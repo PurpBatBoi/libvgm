@@ -165,6 +165,9 @@
     <ClCompile Include="emu\cores\es5503.c" />
     <ClCompile Include="emu\cores\gb.c" />
     <ClCompile Include="emu\cores\ics2115.c" />
+    <ClCompile Include="emu\cores\snes_spc700.c" />
+    <ClCompile Include="emu\cores\snes_dsp.c" />
+    <ClCompile Include="emu\cores\snes_apu.c" />
     <ClCompile Include="emu\cores\iremga20.c" />
     <ClCompile Include="emu\cores\k005289.c" />
     <ClCompile Include="libs\blep_filter\blep_filter.c" />
@@ -239,6 +242,9 @@
     <ClInclude Include="emu\cores\es5503.h" />
     <ClInclude Include="emu\cores\gb.h" />
     <ClInclude Include="emu\cores\ics2115.h" />
+    <ClInclude Include="emu\cores\snes_spc700.h" />
+    <ClInclude Include="emu\cores\snes_dsp.h" />
+    <ClInclude Include="emu\cores\snes_apu.h" />
     <ClInclude Include="emu\cores\iremga20.h" />
     <ClInclude Include="emu\cores\k005289.h" />
     <ClInclude Include="libs\blep_filter\blep_filter.h" />

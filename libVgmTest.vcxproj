@@ -158,6 +158,7 @@
     <ClInclude Include="common_def.h" />
     <ClInclude Include="player\droplayer.hpp" />
     <ClInclude Include="player\gymplayer.hpp" />
+    <ClInclude Include="player\spcplayer.hpp" />
     <ClInclude Include="player\playera.hpp" />
     <ClInclude Include="utils\DataLoader.h" />
     <ClInclude Include="utils\FileLoader.h" />
@@ -192,6 +193,7 @@
     <ClCompile Include="player.cpp" />
     <ClCompile Include="player\droplayer.cpp" />
     <ClCompile Include="player\gymplayer.cpp" />
+    <ClCompile Include="player\spcplayer.cpp" />
     <ClCompile Include="player\playera.cpp" />
     <ClCompile Include="utils\DataLoader.c" />
     <ClCompile Include="utils\FileLoader.c" />

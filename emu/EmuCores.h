@@ -21,5 +21,6 @@
 #define FCC_BNES	0x424E4553	// BeesNES
 #define FCC_YMFM	0x594D464D	// ymfm
 #define FCC_ARES	0x41524553	// ares
+#define FCC_SNAG	0x534E4147	// Snaggletooth
 
 #endif	// __EMUCORES_H__

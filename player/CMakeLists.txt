@@ -9,6 +9,7 @@ set(PLAYER_FILES
 	droplayer.cpp
 	gymplayer.cpp
 	s98player.cpp
+	spcplayer.cpp
 	vgmplayer_cmdhandler.cpp
 	vgmplayer.cpp
 	playera.cpp
@@ -21,6 +22,7 @@ set(PLAYER_HEADERS
 	droplayer.hpp
 	gymplayer.hpp
 	s98player.hpp
+	spcplayer.hpp
 	vgmplayer.hpp
 	playera.hpp
 )

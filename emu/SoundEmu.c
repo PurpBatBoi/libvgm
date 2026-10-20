@@ -53,6 +53,7 @@
 #define SNDDEV_MSM5205
 #define SNDDEV_BSMT2000
 #define SNDDEV_ICS2115
+#define SNDDEV_SNES_APU
 #define SNDDEV_YM2414
 #endif
 
@@ -169,6 +170,9 @@
 #endif
 #ifdef SNDDEV_ICS2115
 #include "cores/ics2115.h"
+#endif
+#ifdef SNDDEV_SNES_APU
+#include "cores/snes_apu.h"
 #endif
 #ifdef SNDDEV_YM2414
 #include "cores/ymfmintf.h"
@@ -309,6 +313,9 @@ const DEV_DECL* sndEmu_Devices[] = {
 #endif
 #ifdef SNDDEV_ICS2115
 	&sndDev_ICS2115,
+#endif
+#ifdef SNDDEV_SNES_APU
+	&sndDev_SNES_APU,
 #endif
 #ifdef SNDDEV_YM2414
 	&sndDev_YM2414,

@@ -21,6 +21,7 @@
 #include "player/s98player.hpp"
 #include "player/droplayer.hpp"
 #include "player/gymplayer.hpp"
+#include "player/spcplayer.hpp"
 #include "player/playera.hpp"
 #include "utils/DataLoader.h"
 #include "utils/FileLoader.h"
@@ -41,6 +42,10 @@
 /* fade length, in seconds */
 static double
 fade_len = 8.0;
+
+/* length in seconds of a file that has none and plays until it is stopped (SPC) */
+static double
+length_secs = 60.0;
 
 static unsigned int
 sample_rate = 44100;
@@ -177,6 +182,19 @@ int main(int argc, const char *argv[]) {
             argv++;
             argc--;
         }
+        else if(str_istarts(*argv,"--length")) {
+            c = strchr(*argv,'=');
+            if(c != NULL) {
+                s = &c[1];
+            } else {
+                argv++;
+                argc--;
+                s = *argv;
+            }
+            length_secs = strtod(s, NULL);
+            argv++;
+            argc--;
+        }
         else {
             break;
         }
@@ -204,6 +222,7 @@ int main(int argc, const char *argv[]) {
         fprintf(stderr,"    --bps n        - bits per sample (default: %d)\n", 16);
         fprintf(stderr,"    --fade x       - fade out length in seconds (default: %.1f)\n", 8.0);
         fprintf(stderr,"    --loops n      - numbers of loops before fade out (default: %d)\n", 2);
+        fprintf(stderr,"    --length x     - seconds to render of a file without a length, like an SPC without tags (default: %.1f)\n", 60.0);
         fprintf(stderr,"Specify \"-\" as output file to write to stdout.\n");
         return 1;
     }
@@ -232,6 +251,7 @@ int main(int argc, const char *argv[]) {
     player.RegisterPlayerEngine(new S98Player);
     player.RegisterPlayerEngine(new DROPlayer);
     player.RegisterPlayerEngine(new GYMPlayer);
+    player.RegisterPlayerEngine(new SPCPlayer);
     player.SetFileReqCallback(request_file_callback, NULL);
 
     /* setup the player's output parameters and allocate internal buffers */
@@ -330,6 +350,11 @@ int main(int argc, const char *argv[]) {
 
     /* figure out how many total frames we're going to render */
     totalFrames = plrEngine->Tick2Sample(plrEngine->GetTotalPlayTicks(loops));
+
+    /* an SPC without a length tag plays until it is stopped: render what the user asked for */
+    if(plrEngine->GetPlayerType() == FCC_SPC && plrEngine->GetTotalTicks() == 0) {
+        totalFrames = (unsigned int)(length_secs * sample_rate);
+    }
 
     /* we only want to fade if there's a looping section. Assumption is
      * if the VGM doesn't specify a loop, it's a song with an actual ending */
