@@ -57,6 +57,7 @@
 #define SNDDEV_VRC6
 #define SNDDEV_N163
 #define SNDDEV_SUNSOFT5B
+#define SNDDEV_MMC5
 #define SNDDEV_YM2414
 #endif
 
@@ -185,6 +186,9 @@
 #endif
 #ifdef SNDDEV_SUNSOFT5B
 #include "cores/beesnes_5b.h"
+#endif
+#ifdef SNDDEV_MMC5
+#include "cores/ares_mmc5.h"
 #endif
 #ifdef SNDDEV_YM2414
 #include "cores/ymfmintf.h"
@@ -337,6 +341,9 @@ const DEV_DECL* sndEmu_Devices[] = {
 #endif
 #ifdef SNDDEV_SUNSOFT5B
 	&sndDev_Sunsoft5B,
+#endif
+#ifdef SNDDEV_MMC5
+	&sndDev_MMC5,
 #endif
 #ifdef SNDDEV_YM2414
 	&sndDev_YM2414,
