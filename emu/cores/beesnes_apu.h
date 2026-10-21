@@ -236,6 +236,8 @@ void        beesnes_apu_tick(beesnes_apu_t *apu);
 // beesnes_apu_quiet_cycles() of them at once; tick once with beesnes_apu_tick() after it before reading or
 // writing the APU.
 UINT32      beesnes_apu_quiet_cycles(const beesnes_apu_t *apu, UINT8 ignore);
+// A register write's delayed effect has not landed yet (it does within a few beesnes_apu_tick() calls).
+bool        beesnes_apu_delays_pending(const beesnes_apu_t *apu);
 void        beesnes_apu_skip(beesnes_apu_t *apu, UINT32 cycles);
 
 // Output of each channel as the mixer sees it, indexed by beesnes_channel_t: pulses, triangle and

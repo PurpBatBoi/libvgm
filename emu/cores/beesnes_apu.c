@@ -659,19 +659,6 @@ static void beesnes_dmc_set_enabled(beesnes_apu_t *apu, bool enabled) {
 
     b_get = (apu->cycles & 1) != 0;
 
-    // A delayed enable/disable of an earlier $4015 write is still pending. libvgm applies all the writes
-    // of an output sample at the same APU cycle, while on the console the next write comes at least 4
-    // cycles later and the earlier write's delay (3-6 cycles) has nearly always run out by then, so
-    // finish it first. Without this, a driver that
-    // stops the DMC and starts a new sample at once ($4015 = $0F then $1F) never restarts it.
-    if (apu->dmc.enable_delay) {
-        apu->dmc.enable_delay = 0;
-        apu->dmc.enabled = apu->dmc.enable_written;
-        if (!apu->dmc.enabled) {
-            apu->dmc.bytes_remaining = 0;
-        }
-    }
-
     apu->dmc.enable_written = enabled;
     apu->dmc.enable_delay = (UINT8)(b_get ? 4 : 3);
 
@@ -1199,6 +1186,19 @@ static bool beesnes_delayed_val_pending(const beesnes_delayed_val_t *dv) {
     return dv->delay != 0 && dv->dirty > 0;
 }
 
+// A register write's delayed effect has not landed yet: a $4017 write (mode switch, frame clock), a $4015
+// write (DMC start / stop), a length counter load or halt, a sequencer restart. They land within a few cycles.
+bool beesnes_apu_delays_pending(const beesnes_apu_t *apu) {
+    return apu->mode_switch || apu->frame_clock_wait || apu->dmc.start_delay || apu->dmc.enable_delay ||
+        apu->pulse1.sequencer.restart_seq || apu->pulse2.sequencer.restart_seq ||
+        apu->triangle.sequencer.restart_seq || apu->noise.sequencer.restart_seq ||
+        beesnes_delayed_val_pending(&apu->dv_4017) ||
+        beesnes_delayed_val_pending(&apu->dv_pulse1_length) || beesnes_delayed_val_pending(&apu->dv_pulse2_length) ||
+        beesnes_delayed_val_pending(&apu->dv_triangle_length) || beesnes_delayed_val_pending(&apu->dv_noise_length) ||
+        beesnes_delayed_val_pending(&apu->dv_pulse1_halt) || beesnes_delayed_val_pending(&apu->dv_pulse2_halt) ||
+        beesnes_delayed_val_pending(&apu->dv_triangle_halt) || beesnes_delayed_val_pending(&apu->dv_noise_halt);
+}
+
 // The channels whose level stays the same however their sequencer moves: the pulses and the noise when
 // they produce no sound for another reason than their sequencer output or their envelope is at 0, the
 // triangle when its sequencer is halted. Lengths, envelopes and linear counters change only on frame clocks.
@@ -1237,16 +1237,7 @@ UINT32 beesnes_apu_quiet_cycles(const beesnes_apu_t *apu, UINT8 ignore) {
     UINT64 limit;
     UINT8 free_running;
 
-    if (apu->mode_switch || apu->frame_clock_wait || apu->dmc.start_delay || apu->dmc.enable_delay ||
-        apu->pulse1.sequencer.restart_seq || apu->pulse2.sequencer.restart_seq ||
-        apu->triangle.sequencer.restart_seq || apu->noise.sequencer.restart_seq) {
-        return 0;
-    }
-    if (beesnes_delayed_val_pending(&apu->dv_4017) ||
-        beesnes_delayed_val_pending(&apu->dv_pulse1_length) || beesnes_delayed_val_pending(&apu->dv_pulse2_length) ||
-        beesnes_delayed_val_pending(&apu->dv_triangle_length) || beesnes_delayed_val_pending(&apu->dv_noise_length) ||
-        beesnes_delayed_val_pending(&apu->dv_pulse1_halt) || beesnes_delayed_val_pending(&apu->dv_pulse2_halt) ||
-        beesnes_delayed_val_pending(&apu->dv_triangle_halt) || beesnes_delayed_val_pending(&apu->dv_noise_halt)) {
+    if (beesnes_apu_delays_pending(apu)) {
         return 0;
     }
 

@@ -42,6 +42,10 @@
 /* blep_filter works on integer levels: the mixed level 1.0 (the loudest the non-linear mixer gives)
 	is this, which leaves room for the overshoot of the band-limited steps below 32767. */
 #define LEVEL_ONE	0x4000
+/* The most cycles a write runs the core ahead to let the delayed effects of the earlier writes land, and
+	the most the writes between two updates run it ahead in all (well inside the band-limited buffer). */
+#define WRITE_AHEAD_CYCLES	16
+#define MAX_AHEAD_CYCLES	4096
 
 typedef struct beesnes_intf
 {
@@ -54,6 +58,8 @@ typedef struct beesnes_intf
 	blip_t* blep[2];
 	INT32 blep_level[2];
 	NES_OUTPUT_FILTER filter[2];
+	/* Cycles the core has run past the end of the last update (see beesnes_intf_write). */
+	UINT32 ahead;
 
 	/* DPCM sample memory for CPU addresses $8000-$FFFF. */
 	const UINT8* memory;
@@ -132,21 +138,42 @@ static void apu_mix_level(const BEESNES_INTF* apu, float* out)
 	}
 }
 
-/* Clocks the core `cycles` times, adding each change of the mixed level as a band-limited step. */
-static void apu_run(BEESNES_INTF* apu, UINT32 cycles)
+/* Clocks the core once, adding a change of the mixed level as a band-limited step at `cycle` of the frame. */
+static void apu_tick(BEESNES_INTF* apu, UINT32 cycle)
 {
-	UINT32 cycle;
-	UINT32 quiet;
 	float level[2];
 	INT32 value;
 	UINT8 side;
 
-	for (cycle = 0; cycle < cycles; cycle ++)
+	beesnes_apu_tick(&apu->core);
+	apu_mix_level(apu, level);
+	for (side = 0; side < 2; side ++)
 	{
-		/* The cycles in which the output cannot change run at once. The first cycle of the frame is always
-			a real tick, which brings in the register writes since the last frame (the output can change with
-			them), and so is the last one, which leaves the state that the next writes see. */
-		if (cycle > 0)
+		value = (INT32)(level[side] * LEVEL_ONE + 0.5f);
+		if (value != apu->blep_level[side])
+		{
+			blip_add_delta(apu->blep[side], cycle, value - apu->blep_level[side]);
+			apu->blep_level[side] = value;
+		}
+	}
+}
+
+/* Clocks the core up to cycle `cycles` of the frame, adding each change of the mixed level as a band-limited
+	step. The cycles a write ran ahead (`ahead`) are the first ones of the frame. */
+static void apu_run(BEESNES_INTF* apu, UINT32 cycles)
+{
+	UINT32 first;
+	UINT32 cycle;
+	UINT32 quiet;
+
+	first = (apu->ahead < cycles) ? apu->ahead : cycles;
+	apu->ahead -= first;
+	for (cycle = first; cycle < cycles; cycle ++)
+	{
+		/* The cycles in which the output cannot change run at once. The first cycle is always a real tick,
+			which brings in the register writes since the last frame (the output can change with them), and
+			so is the last one, which leaves the state that the next writes see. */
+		if (cycle > first)
 		{
 			/* the muted channels and the ultrasonic triangle are not heard */
 			quiet = beesnes_apu_quiet_cycles(&apu->core, (UINT8)(apu->mute_mask |
@@ -159,17 +186,7 @@ static void apu_run(BEESNES_INTF* apu, UINT32 cycles)
 				cycle += quiet;
 			}
 		}
-		beesnes_apu_tick(&apu->core);
-		apu_mix_level(apu, level);
-		for (side = 0; side < 2; side ++)
-		{
-			value = (INT32)(level[side] * LEVEL_ONE + 0.5f);
-			if (value != apu->blep_level[side])
-			{
-				blip_add_delta(apu->blep[side], cycle, value - apu->blep_level[side]);
-				apu->blep_level[side] = value;
-			}
-		}
+		apu_tick(apu, cycle);
 	}
 }
 
@@ -242,11 +259,13 @@ void beesnes_intf_reset(void* chip)
 		apu->blep_level[side] = (INT32)(level[side] * LEVEL_ONE + 0.5f);
 		nes_output_filter_init(&apu->filter[side], (float)apu->sample_rate);
 	}
+	apu->ahead = 0;
 }
 
 void beesnes_intf_write(void* chip, UINT8 offset, UINT8 data)
 {
 	BEESNES_INTF* apu = (BEESNES_INTF*)chip;
+	UINT32 i;
 
 	switch(offset)
 	{
@@ -260,6 +279,14 @@ void beesnes_intf_write(void* chip, UINT8 offset, UINT8 data)
 			return;
 		break;
 	}
+	/* libvgm applies all the writes of an output sample at one time, while the CPU spreads them over it, at
+		least 4 cycles apart. The core delays some effects of a write by a few cycles (the frame clock of a
+		$4017 write, a DMC stop by $4015, length counter loads), and a driver's next write can count on
+		them: $4017 = $C0 between two $4001 writes clocks the sweep while it is enabled, $4015 = $0F then
+		$1F restarts the DPCM sample. So the core runs ahead until they have landed, from the start of the
+		next frame on; the next update does not run those cycles again. */
+	for (i = 0; i < WRITE_AHEAD_CYCLES && apu->ahead < MAX_AHEAD_CYCLES && beesnes_apu_delays_pending(&apu->core); i ++)
+		apu_tick(apu, apu->ahead ++);
 	beesnes_apu_write(&apu->core, (UINT16)(0x4000 | offset), data);
 }
 
