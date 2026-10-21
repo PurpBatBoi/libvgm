@@ -55,6 +55,7 @@
 #define SNDDEV_ICS2115
 #define SNDDEV_SNES_APU
 #define SNDDEV_VRC6
+#define SNDDEV_N163
 #define SNDDEV_YM2414
 #endif
 
@@ -177,6 +178,9 @@
 #endif
 #ifdef SNDDEV_VRC6
 #include "cores/beesnes_vrc6.h"
+#endif
+#ifdef SNDDEV_N163
+#include "cores/beesnes_n163.h"
 #endif
 #ifdef SNDDEV_YM2414
 #include "cores/ymfmintf.h"
@@ -323,6 +327,9 @@ const DEV_DECL* sndEmu_Devices[] = {
 #endif
 #ifdef SNDDEV_VRC6
 	&sndDev_VRC6,
+#endif
+#ifdef SNDDEV_N163
+	&sndDev_N163,
 #endif
 #ifdef SNDDEV_YM2414
 	&sndDev_YM2414,
