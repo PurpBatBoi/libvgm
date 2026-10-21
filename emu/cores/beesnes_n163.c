@@ -35,10 +35,9 @@
 	  player) applies the register writes with the CPU address and renders the device up to the write's
 	  sample first. The decoding is the mapper's: $4800-$4FFF data port (read and write), $E000-$E7FF sound
 	  disable (bit 6 of the PRG bank 0 register), $F800-$FFFF address port.
-	- The output is the one the C++ gives: every 15th CPU cycle one channel is processed (the channels go
-	  from the highest number down to channel 1, as many as $7F bits 4-6 say) and its signed 4-bit sample
-	  times its volume, / 120, replaces the output until the next channel, 15 cycles later. That is the
-	  time-multiplexed output of the chip, not a sum. The channel's phase goes back into the RAM.
+	- Every 15th CPU cycle one channel is processed, as in the C++ (the channels go from the highest number
+	  down to channel 1, as many as $7F bits 4-6 say): its signed 4-bit sample times its volume, / 120, is
+	  the channel's output until its next turn. The channel's phase goes back into the RAM.
 	- The level of the sample in the mix is its float times 0.65392053127288818359375, the volume the mapper
 	  sets for submapper 4 (a Namco 163 board 16-17 dB above the loudest APU square wave,
 	  https://www.nesdev.org/wiki/N163_audio). The C++ gives the NSF no board; the other submappers are
@@ -48,11 +47,17 @@
 	    buffer at the CPU clock and out through the console filter, at the output rate. The C++'s own
 	    stage (the APU's mixer, low-pass and output poles) is not part of the port. The level is the
 	    sample times NES_EXPOUT_LEVEL_ONE, the scale of the APU.
+	  - The output is the mean of the outputs of the active channels, not the time-multiplexed output of
+	    the C++ (the processed channel alone until the next one, 15 cycles later). The mean is the time
+	    average of the multiplexed output, so the level is the same; the multiplexing adds a carrier at
+	    the CPU clock / (15 * channels) (14.9 kHz with 8 channels) whose sidebands at the carrier minus
+	    the notes fall into the audible band and sound as off-pitch notes. NSFPlay (by default) and
+	    libgme mix the channels too.
 	  - The chip is enabled after a reset. The C++ is disabled until the mapper writes $E000, which a
 	    cartridge does at start; an NSF does not have to (the NSF format does not list $E000 for the N163).
 	    A disabled chip keeps its last sample, as in the C++.
 	  - Reset zeroes the RAM and all state, which is the C++'s ResetFull(true) (the mapper's Reset).
-	  - A mute mask (bit per channel) sets the output of a channel to 0 in the multiplexing. The channel
+	  - A mute mask (bit per channel) sets the output of a channel to 0 in the mean. The channel
 	    still runs, its phase advances.
 	  - The device runs at any output rate, up to the CPU clock / 4 (a higher rate is resampled by libvgm),
 	    like the BeesNES APU device.
@@ -177,7 +182,8 @@ typedef struct n163_chip
 	UINT8 auto_inc;				/** Address auto-increment flag. */
 	UINT8 cycle_count;			/** Tracks CPU cycles to generate the 15-cycle channel update clock. */
 	UINT8 current_channel;		/** The current channel being processed during multiplexing. */
-	INT32 level;				/** The output level of the last sample (NES_EXPOUT_LEVEL_ONE scale). */
+	float ch_out[8];			/** The output of each channel at its last turn. */
+	INT32 level;				/** The output level (NES_EXPOUT_LEVEL_ONE scale). */
 	UINT8 enabled;				/** Is sound enabled? */
 
 	UINT8 mute_mask;
@@ -226,7 +232,7 @@ static UINT8 n163_r(void* info, UINT16 addr)
 }
 
 /**
- * Processes a single channel and updates the multiplexed output.
+ * Processes a single channel and updates the output, the mean of the active channels.
  */
 INLINE void n163_audio_tick(N163_CHIP* chip)
 {
@@ -241,6 +247,7 @@ INLINE void n163_audio_tick(N163_CHIP* chip)
 	INT32 sample;
 	INT32 vol;
 	float out;
+	UINT8 ch;
 
 	if (! chip->enabled)
 		return;
@@ -285,9 +292,14 @@ INLINE void n163_audio_tick(N163_CHIP* chip)
 
 	// Normalize.
 	if (chip->mute_mask & (1 << chip->current_channel))
-		out = 0.0f;
+		chip->ch_out[chip->current_channel] = 0.0f;
 	else
-		out = (float)(sample * vol) / 120.0f * N163_VOLUME;
+		chip->ch_out[chip->current_channel] = (float)(sample * vol) / 120.0f * N163_VOLUME;
+
+	out = 0.0f;
+	for (ch = 0; ch < num_channels; ch ++)
+		out += chip->ch_out[ch];
+	out /= num_channels;
 	chip->level = (INT32)(out * NES_EXPOUT_LEVEL_ONE + 0.5f);
 }
 
@@ -377,6 +389,7 @@ static void n163_reset(void* info)
 	chip->auto_inc = 0;
 	chip->cycle_count = 0;
 	chip->current_channel = 0;
+	memset(chip->ch_out, 0x00, sizeof(chip->ch_out));
 	chip->level = 0;
 	chip->enabled = 1;
 

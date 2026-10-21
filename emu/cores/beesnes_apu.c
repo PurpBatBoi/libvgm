@@ -659,6 +659,19 @@ static void beesnes_dmc_set_enabled(beesnes_apu_t *apu, bool enabled) {
 
     b_get = (apu->cycles & 1) != 0;
 
+    // A delayed enable/disable of an earlier $4015 write is still pending. libvgm applies all the writes
+    // of an output sample at the same APU cycle, while on the console the next write comes at least 4
+    // cycles later and the earlier write's delay (3-6 cycles) has nearly always run out by then, so
+    // finish it first. Without this, a driver that
+    // stops the DMC and starts a new sample at once ($4015 = $0F then $1F) never restarts it.
+    if (apu->dmc.enable_delay) {
+        apu->dmc.enable_delay = 0;
+        apu->dmc.enabled = apu->dmc.enable_written;
+        if (!apu->dmc.enabled) {
+            apu->dmc.bytes_remaining = 0;
+        }
+    }
+
     apu->dmc.enable_written = enabled;
     apu->dmc.enable_delay = (UINT8)(b_get ? 4 : 3);
 
