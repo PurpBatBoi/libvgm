@@ -52,6 +52,7 @@
 #define DEVID_SNES_APU	0x30	// SNES audio unit (SPC700 + S-DSP), played from .spc files only
 #define DEVID_VRC6		0x31	// Konami VRC6 expansion audio, played from NSF files only
 #define DEVID_N163		0x32	// Namco 163 expansion audio, played from NSF files only
+#define DEVID_SUNSOFT5B	0x33	// Sunsoft 5B expansion audio, played from NSF files only
 #define DEVID_YM2414	0x81	// YM2414 (OPZ), used in TX81Z
 
 #endif	// __SOUNDDEVS_H__

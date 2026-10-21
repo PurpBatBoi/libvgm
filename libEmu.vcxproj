@@ -170,6 +170,7 @@
     <ClCompile Include="emu\cores\snes_apu.c" />
     <ClCompile Include="emu\cores\beesnes_vrc6.c" />
     <ClCompile Include="emu\cores\beesnes_n163.c" />
+    <ClCompile Include="emu\cores\beesnes_5b.c" />
     <ClCompile Include="emu\cores\iremga20.c" />
     <ClCompile Include="emu\cores\k005289.c" />
     <ClCompile Include="libs\blep_filter\blep_filter.c" />
@@ -249,6 +250,7 @@
     <ClInclude Include="emu\cores\snes_apu.h" />
     <ClInclude Include="emu\cores\beesnes_vrc6.h" />
     <ClInclude Include="emu\cores\beesnes_n163.h" />
+    <ClInclude Include="emu\cores\beesnes_5b.h" />
     <ClInclude Include="emu\cores\nes_expout.h" />
     <ClInclude Include="emu\cores\iremga20.h" />
     <ClInclude Include="emu\cores\k005289.h" />
