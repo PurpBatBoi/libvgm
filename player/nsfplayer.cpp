@@ -91,6 +91,9 @@ NSFPlayer::NSFPlayer() :
 	_playTicks(0),
 	_fadeTicks(0),
 	_totalTicks(0),
+	_speedNum(1000),
+	_tickBase(0),
+	_smplBase(0),
 	_tsMult(0),
 	_tsDiv(NSF_TICK_RATE),
 	_phase(PHASE_IDLE),
@@ -874,21 +877,43 @@ UINT8 NSFPlayer::SetSampleRate(UINT32 sampleRate)
 	return 0x00;
 }
 
-// The machine is the song: its speed is fixed by the console, so the playback speed is always 100%.
+// The machine runs at the speed of the console; the playback speed is the rate of the PLAY calls (the tempo of
+// the song, the pitch is in the registers). What the driver does not time with PLAY (the DPCM, a PLAY that does not
+// return) keeps its speed.
 double NSFPlayer::GetPlaybackSpeed(void) const
 {
-	return 1.0;
+	return _speedNum / 1000.0;
 }
 
 UINT8 NSFPlayer::SetPlaybackSpeed(double speed)
 {
-	return (speed == 1.0) ? 0x00 : 0xFF;
+	UINT32 speedNum;
+
+	if (! (speed >= 0.01 && speed <= 1000.0))
+		return 0xFF;
+	speedNum = (UINT32)(speed * 1000.0 + 0.5);
+	if (speedNum == _speedNum)
+		return 0x00;
+
+	// the position goes on from where it is
+	_tickBase = _playTick;
+	_smplBase = _playSmpl;
+	_speedNum = speedNum;
+	RefreshTSRates();
+
+	// the next PLAY stays where it is, the ones after it follow the new period
+	if (_phase != PHASE_INIT && _nextPlay != (UINT64)-1)
+	{
+		_playBase = _nextPlay;
+		_playIndex = 0;
+	}
+	return 0x00;
 }
 
 void NSFPlayer::RefreshTSRates(void)
 {
-	_tsMult = _outSmplRate;
-	_tsDiv = _tickFreq;
+	_tsMult = (UINT64)_outSmplRate * 1000;
+	_tsDiv = (UINT64)_tickFreq * _speedNum;
 	return;
 }
 
@@ -896,7 +921,9 @@ UINT32 NSFPlayer::Tick2Sample(UINT32 ticks) const
 {
 	if (ticks == (UINT32)-1)
 		return -1;
-	return (UINT32)(ticks * _tsMult / _tsDiv);
+	if (ticks <= _tickBase)
+		return _smplBase;
+	return (UINT32)(_smplBase + (ticks - _tickBase) * _tsMult / _tsDiv);
 }
 
 UINT32 NSFPlayer::Sample2Tick(UINT32 samples) const
@@ -905,7 +932,9 @@ UINT32 NSFPlayer::Sample2Tick(UINT32 samples) const
 		return -1;
 	if (_tsMult == 0)
 		return 0;
-	return (UINT32)(samples * _tsDiv / _tsMult);
+	if (samples <= _smplBase)
+		return _tickBase;
+	return (UINT32)(_tickBase + (samples - _smplBase) * _tsDiv / _tsMult);
 }
 
 double NSFPlayer::Tick2Second(UINT32 ticks) const
@@ -1124,6 +1153,8 @@ UINT8 NSFPlayer::Reset(void)
 
 	_playTick = 0;
 	_playSmpl = 0;
+	_tickBase = 0;
+	_smplBase = 0;
 	_devSmpl = 0;
 	nes_output_filter_init(&_vrc7Filter->l, (float)_outSmplRate);
 	nes_output_filter_init(&_vrc7Filter->r, (float)_outSmplRate);
@@ -1153,6 +1184,9 @@ UINT8 NSFPlayer::Seek(UINT8 unit, UINT32 pos)
 	switch(unit)
 	{
 	case PLAYPOS_SAMPLE:
+		// (before the current stretch of the conversion, the song restarts, which also restarts the conversion)
+		if (pos < _smplBase)
+			Reset();
 		pos = Sample2Tick(pos);
 		// fall through
 	case PLAYPOS_TICK:
@@ -1345,10 +1379,14 @@ UINT64 NSFPlayer::SampleToCycle(UINT32 smpl) const
 	return ((UINT64)smpl * _cpuClock + _outSmplRate - 1) / _outSmplRate;
 }
 
-// The cycle of the call of PLAY with the number `index`, counted from the end of INIT.
+// The cycle of the call of PLAY with the number `index`, counted from the end of INIT (or from the speed change):
+// index * period * cpuClock / (1000000 * speed), exact, in two parts so that it does not overflow.
 UINT64 NSFPlayer::PlayTime(UINT32 index) const
 {
-	return _playBase + (UINT64)index * _playPeriodUs * _cpuClock / 1000000;
+	UINT64 num = (UINT64)_playPeriodUs * _cpuClock * 1000;
+	UINT64 den = (UINT64)1000000 * _speedNum;
+
+	return _playBase + (UINT64)index * (num / den) + (UINT64)index * (num % den) / den;
 }
 
 // PLAY returned: the next call is the first one of the schedule that is not before the cycle now. A PLAY

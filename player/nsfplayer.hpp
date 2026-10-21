@@ -272,7 +272,12 @@ private:
 	std::map<std::string, std::string> _tagData;
 	std::vector<const char*> _tagList;
 
-	// tick/sample conversion rates
+	// tick/sample conversion rates. The speed scales the rate of the PLAY calls; a tick is a millisecond of the
+	// song at speed 1. A change of the speed during the song starts a new stretch of the conversion at the
+	// position then (_tickBase ticks = _smplBase samples), so the position does not jump.
+	UINT32 _speedNum;		// the playback speed in thousandths
+	UINT32 _tickBase;
+	UINT32 _smplBase;
 	UINT64 _tsMult;
 	UINT64 _tsDiv;
 
