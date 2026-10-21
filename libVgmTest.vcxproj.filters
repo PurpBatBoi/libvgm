@@ -60,6 +60,12 @@
     <ClInclude Include="player\spcplayer.hpp">
       <Filter>Headerdateien</Filter>
     </ClInclude>
+    <ClInclude Include="player\nsfplayer.hpp">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
+    <ClInclude Include="player\nsf_cpu6502.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="emutest.c">
@@ -120,6 +126,12 @@
       <Filter>Quelldateien</Filter>
     </ClCompile>
     <ClCompile Include="player\spcplayer.cpp">
+      <Filter>Quelldateien</Filter>
+    </ClCompile>
+    <ClCompile Include="player\nsfplayer.cpp">
+      <Filter>Quelldateien</Filter>
+    </ClCompile>
+    <ClCompile Include="player\nsf_cpu6502.c">
       <Filter>Quelldateien</Filter>
     </ClCompile>
   </ItemGroup>

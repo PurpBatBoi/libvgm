@@ -22,6 +22,7 @@
 #include "player/droplayer.hpp"
 #include "player/gymplayer.hpp"
 #include "player/spcplayer.hpp"
+#include "player/nsfplayer.hpp"
 #include "player/playera.hpp"
 #include "utils/DataLoader.h"
 #include "utils/FileLoader.h"
@@ -43,9 +44,13 @@
 static double
 fade_len = 8.0;
 
-/* length in seconds of a file that has none and plays until it is stopped (SPC) */
+/* length in seconds of a file that has none and plays until it is stopped (SPC, NSF) */
 static double
 length_secs = 60.0;
+
+/* song of a file with several (NSF), 1 = the first; 0 = the one the file starts with */
+static unsigned int
+track = 0;
 
 static unsigned int
 sample_rate = 44100;
@@ -195,6 +200,19 @@ int main(int argc, const char *argv[]) {
             argv++;
             argc--;
         }
+        else if(str_istarts(*argv,"--track")) {
+            c = strchr(*argv,'=');
+            if(c != NULL) {
+                s = &c[1];
+            } else {
+                argv++;
+                argc--;
+                s = *argv;
+            }
+            track = scan_uint(s);
+            argv++;
+            argc--;
+        }
         else {
             break;
         }
@@ -223,6 +241,7 @@ int main(int argc, const char *argv[]) {
         fprintf(stderr,"    --fade x       - fade out length in seconds (default: %.1f)\n", 8.0);
         fprintf(stderr,"    --loops n      - numbers of loops before fade out (default: %d)\n", 2);
         fprintf(stderr,"    --length x     - seconds to render of a file without a length, like an SPC without tags (default: %.1f)\n", 60.0);
+        fprintf(stderr,"    --track n      - song to play of a file with several, like an NSF (default: the one the file starts with)\n");
         fprintf(stderr,"Specify \"-\" as output file to write to stdout.\n");
         return 1;
     }
@@ -252,6 +271,7 @@ int main(int argc, const char *argv[]) {
     player.RegisterPlayerEngine(new DROPlayer);
     player.RegisterPlayerEngine(new GYMPlayer);
     player.RegisterPlayerEngine(new SPCPlayer);
+    player.RegisterPlayerEngine(new NSFPlayer);
     player.SetFileReqCallback(request_file_callback, NULL);
 
     /* setup the player's output parameters and allocate internal buffers */
@@ -317,6 +337,19 @@ int main(int argc, const char *argv[]) {
         player.SetLoopCount(vgmplay->GetModifiedLoopCount(loops));
     }
 
+    if (plrEngine->GetPlayerType() == FCC_NSF)
+    {
+        NSFPlayer* nsfplay = dynamic_cast<NSFPlayer*>(plrEngine);
+
+        if (track > 0) {
+            if (nsfplay->SelectSong((UINT16)(track - 1))) {
+                fprintf(stderr,"the file has no song %u (it has %u)\n",track,(unsigned int)nsfplay->GetSongCount());
+                return 1;
+            }
+        }
+        fprintf(stderr,"Song: %u of %u\n",(unsigned int)(nsfplay->GetCurSong() + 1),(unsigned int)nsfplay->GetSongCount());
+    }
+
     /* example for setting cores */
     /* TODO provide interface for user to specify cores
      * for devices, like:
@@ -351,8 +384,8 @@ int main(int argc, const char *argv[]) {
     /* figure out how many total frames we're going to render */
     totalFrames = plrEngine->Tick2Sample(plrEngine->GetTotalPlayTicks(loops));
 
-    /* an SPC without a length tag plays until it is stopped: render what the user asked for */
-    if(plrEngine->GetPlayerType() == FCC_SPC && plrEngine->GetTotalTicks() == 0) {
+    /* an SPC or NSF without a length plays until it is stopped: render what the user asked for */
+    if((plrEngine->GetPlayerType() == FCC_SPC || plrEngine->GetPlayerType() == FCC_NSF) && plrEngine->GetTotalTicks() == 0) {
         totalFrames = (unsigned int)(length_secs * sample_rate);
     }
 

@@ -30,6 +30,7 @@ static UINT8 device_start_ym2413_emu(const DEV_GEN_CFG* cfg, DEV_INFO* retDevInf
 static void ym2413_update_emu(void *chip, UINT32 samples, DEV_SMPL **out);
 static void ym2413_set_mute_mask_emu(void *chip, UINT32 MuteMask);
 static void ym2413_pan_emu(void* chip, const INT16* PanVals);
+static void ym2413_write_patch(void* chip, UINT32 offset, UINT32 length, const UINT8* data);
 
 
 static DEVDEF_RWFUNC devFunc[] =
@@ -38,6 +39,7 @@ static DEVDEF_RWFUNC devFunc[] =
 	{RWF_REGISTER | RWF_QUICKWRITE, DEVRW_A8D8, 0, EOPLL_writeReg},
 	{RWF_CHN_MUTE | RWF_WRITE, DEVRW_ALL, 0, ym2413_set_mute_mask_emu},
 	{RWF_CHN_PAN | RWF_WRITE, DEVRW_ALL, 0, ym2413_pan_emu},
+	{RWF_MEMORY | RWF_WRITE, DEVRW_BLOCK, 0, ym2413_write_patch},
 	{0x00, 0x00, 0, NULL}
 };
 DEV_DEF devDef_YM2413_Emu =
@@ -1572,6 +1574,24 @@ static UINT8 device_start_ym2413_emu(const DEV_GEN_CFG* cfg, DEV_INFO* retDevInf
 	chip->_devData.chipInf = chip;
 	INIT_DEVINF(retDevInf, &chip->_devData, rate, &devDef_YM2413_Emu);
 	return 0x00;
+}
+
+/* Replaces the instrument set (the NSFe VRC7 chunk): 128 bytes (the 16 patches of the VRC7) or 152 bytes (and the 3
+   rhythm patches of the YM2413), 8 bytes per patch. Patch 0 is the custom instrument that the registers 0-7 write,
+   it is not replaced. The patches stay when the chip is reset. */
+static void ym2413_write_patch(void *chip, UINT32 offset, UINT32 length, const UINT8 *data)
+{
+	EOPLL *opll = (EOPLL *)chip;
+	uint8_t dump[19 * 8];
+	int i;
+	
+	if (offset != 0 || (length != 128 && length != 152))
+		return;
+	for (i = 0; i < 19; i++)
+		EOPLL_patchToDump(&opll->patch[i * 2], &dump[i * 8]);
+	memcpy(&dump[8], &data[8], length - 8);
+	EOPLL_setPatch(opll, dump);
+	return;
 }
 
 static void ym2413_update_emu(void *chip, UINT32 samples, DEV_SMPL **out)

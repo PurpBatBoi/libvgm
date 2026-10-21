@@ -36,6 +36,7 @@ extern "C" int __cdecl _kbhit(void);
 #include "player/vgmplayer.hpp"
 #include "player/gymplayer.hpp"
 #include "player/spcplayer.hpp"
+#include "player/nsfplayer.hpp"
 #include "player/playera.hpp"
 #include "audio/AudioStream.h"
 #include "audio/AudioStream_SpcDrvFuns.h"
@@ -141,6 +142,7 @@ int main(int argc, char* argv[])
 	mainPlr.RegisterPlayerEngine(new DROPlayer);
 	mainPlr.RegisterPlayerEngine(new GYMPlayer);
 	mainPlr.RegisterPlayerEngine(new SPCPlayer);
+	mainPlr.RegisterPlayerEngine(new NSFPlayer);
 	mainPlr.SetEventCallback(FilePlayCallback, NULL);
 	mainPlr.SetFileReqCallback(RequestFileCallback, NULL);
 	mainPlr.SetLogCallback(PlayerLogCallback, NULL);

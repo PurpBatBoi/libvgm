@@ -10,6 +10,8 @@ set(PLAYER_FILES
 	gymplayer.cpp
 	s98player.cpp
 	spcplayer.cpp
+	nsf_cpu6502.c
+	nsfplayer.cpp
 	vgmplayer_cmdhandler.cpp
 	vgmplayer.cpp
 	playera.cpp
@@ -23,6 +25,8 @@ set(PLAYER_HEADERS
 	gymplayer.hpp
 	s98player.hpp
 	spcplayer.hpp
+	nsf_cpu6502.h
+	nsfplayer.hpp
 	vgmplayer.hpp
 	playera.hpp
 )
