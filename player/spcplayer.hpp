@@ -58,6 +58,7 @@ private:
 	{
 		VGM_BASEDEV base;
 		DEVFUNC_WRITE_BLOCK memWrite;
+		DEVFUNC_WRITE_TEMPO tempoWrite;
 	};
 
 public:
@@ -104,6 +105,7 @@ public:
 private:
 	size_t DeviceID2OptionID(UINT32 id) const;
 	void RefreshMuting(SPC_CHIPDEV& chipDev, const PLR_MUTE_OPTS& muteOpts);
+	void RefreshTempo(SPC_CHIPDEV& chipDev);
 
 	static bool IsTextID666(const UINT8* hdr);
 	void CalcSongLength(void);
@@ -148,7 +150,13 @@ private:
 	std::map<std::string, std::string> _tagData;
 	std::vector<const char*> _tagList;
 
-	// tick/sample conversion rates
+	// tick/sample conversion rates. The speed is the speed of the timers of the audio unit, which a music driver
+	// counts its tempo with; a tick is a frame of the audio unit at speed 1. A change of the speed during the song
+	// starts a new stretch of the conversion at the position then (_tickBase ticks = _smplBase samples), so the
+	// position does not jump.
+	UINT32 _speedNum;		// the playback speed in thousandths
+	UINT32 _tickBase;
+	UINT32 _smplBase;
 	UINT64 _tsMult;
 	UINT64 _tsDiv;
 

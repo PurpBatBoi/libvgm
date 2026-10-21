@@ -57,6 +57,7 @@ typedef void (*DEVFUNC_WRITE_BLOCK)(void* info, UINT32 offset, UINT32 length, co
 typedef void (*DEVFUNC_WRITE_CLOCK)(void* info, UINT32 clock);
 typedef void (*DEVFUNC_WRITE_VOLUME)(void* info, INT32 volume);	// 16.16 fixed point
 typedef void (*DEVFUNC_WRITE_VOL_LR)(void* info, INT32 volL, INT32 volR);
+typedef void (*DEVFUNC_WRITE_TEMPO)(void* info, INT32 speed);	// 16.16 fixed point, 0x10000 = normal
 
 #define RWF_WRITE		0x00
 #define RWF_READ		0x01
@@ -71,6 +72,7 @@ typedef void (*DEVFUNC_WRITE_VOL_LR)(void* info, INT32 volL, INT32 volR);
 #define RWF_VOLUME_LR	0x86	// volume (left/right separately)
 #define RWF_CHN_MUTE	0x90	// set channel muting (DEVRW_VALUE = single channel, DEVRW_ALL = mask)
 #define RWF_CHN_PAN		0x92	// set channel panning (DEVRW_VALUE = single channel, DEVRW_ALL = array)
+#define RWF_TEMPO		0x94	// speed of the chip's own timers, for the tempo of music drivers that count time with them (SNES APU)
 
 // register/memory DEVRW constants
 #define DEVRW_A8D8		0x11	//  8-bit address,  8-bit data

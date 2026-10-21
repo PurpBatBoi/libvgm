@@ -62,6 +62,9 @@ SPCPlayer::SPCPlayer() :
 	_playTicks(0),
 	_fadeTicks(0),
 	_totalTicks(0),
+	_speedNum(1000),
+	_tickBase(0),
+	_smplBase(0),
 	_tsMult(0),
 	_tsDiv(SPC_TICK_RATE),
 	_playSmpl(0),
@@ -593,21 +596,46 @@ UINT8 SPCPlayer::SetSampleRate(UINT32 sampleRate)
 	return 0x00;
 }
 
-// The audio unit is the song: its speed is fixed by the machine, so the playback speed is always 100%.
+// The audio unit runs at the speed of the console; the playback speed is the speed of its three timers (the tempo
+// of the song, the pitch is in the DSP). What the DSP does by itself (the envelopes, the echo) and the speed of
+// the CPU keep their speed, as the chips of a VGM do.
 double SPCPlayer::GetPlaybackSpeed(void) const
 {
-	return 1.0;
+	return _speedNum / 1000.0;
 }
 
 UINT8 SPCPlayer::SetPlaybackSpeed(double speed)
 {
-	return (speed == 1.0) ? 0x00 : 0xFF;
+	UINT32 speedNum;
+
+	if (! (speed >= 0.01 && speed <= 1000.0))
+		return 0xFF;
+	speedNum = (UINT32)(speed * 1000.0 + 0.5);
+	if (speedNum == _speedNum)
+		return 0x00;
+
+	// the position goes on from where it is
+	_tickBase = _playTick;
+	_smplBase = _playSmpl;
+	_speedNum = speedNum;
+	RefreshTSRates();
+	if (! _devices.empty())
+		RefreshTempo(_devices[0]);
+	return 0x00;
+}
+
+// The speed to the timers of the audio unit (16.16 fixed point).
+void SPCPlayer::RefreshTempo(SPC_CHIPDEV& chipDev)
+{
+	if (chipDev.base.defInf.dataPtr != NULL && chipDev.tempoWrite != NULL)
+		chipDev.tempoWrite(chipDev.base.defInf.dataPtr, (INT32)(((UINT64)_speedNum << 16) / 1000));
+	return;
 }
 
 void SPCPlayer::RefreshTSRates(void)
 {
-	_tsMult = _outSmplRate;
-	_tsDiv = _tickFreq;
+	_tsMult = (UINT64)_outSmplRate * 1000;
+	_tsDiv = (UINT64)_tickFreq * _speedNum;
 	return;
 }
 
@@ -615,7 +643,9 @@ UINT32 SPCPlayer::Tick2Sample(UINT32 ticks) const
 {
 	if (ticks == (UINT32)-1)
 		return -1;
-	return (UINT32)(ticks * _tsMult / _tsDiv);
+	if (ticks <= _tickBase)
+		return _smplBase;
+	return (UINT32)(_smplBase + (ticks - _tickBase) * _tsMult / _tsDiv);
 }
 
 UINT32 SPCPlayer::Sample2Tick(UINT32 samples) const
@@ -624,7 +654,9 @@ UINT32 SPCPlayer::Sample2Tick(UINT32 samples) const
 		return -1;
 	if (_tsMult == 0)
 		return 0;
-	return (UINT32)(samples * _tsDiv / _tsMult);
+	if (samples <= _smplBase)
+		return _tickBase;
+	return (UINT32)(_tickBase + (samples - _smplBase) * _tsDiv / _tsMult);
 }
 
 double SPCPlayer::Tick2Second(UINT32 ticks) const
@@ -700,6 +732,7 @@ UINT8 SPCPlayer::Start(void)
 	cDev->base.defInf.dataPtr = NULL;
 	cDev->base.linkDev = NULL;
 	cDev->memWrite = NULL;
+	cDev->tempoWrite = NULL;
 
 	devCfg->emuCore = _devOpts.emuCore[0];
 	devCfg->srMode = _devOpts.srMode;
@@ -720,6 +753,8 @@ UINT8 SPCPlayer::Start(void)
 	}
 	// the whole file is the machine image: the device keeps it for Reset
 	cDev->memWrite(cDev->base.defInf.dataPtr, 0x00, _fileLen, _fileData);
+	SndEmu_GetDeviceFunc(cDev->base.defInf.devDef, RWF_TEMPO | RWF_WRITE, DEVRW_VALUE, 0, (void**)&cDev->tempoWrite);
+	RefreshTempo(*cDev);
 
 	SetupLinkedDevices(&cDev->base, NULL, NULL);
 	if (cDev->base.defInf.devDef->SetOptionBits != NULL)
@@ -763,6 +798,8 @@ UINT8 SPCPlayer::Reset(void)
 
 	_playTick = 0;
 	_playSmpl = 0;
+	_tickBase = 0;
+	_smplBase = 0;
 	_playState &= ~PLAYSTATE_END;
 
 	RefreshTSRates();
@@ -784,6 +821,9 @@ UINT8 SPCPlayer::Seek(UINT8 unit, UINT32 pos)
 	switch(unit)
 	{
 	case PLAYPOS_SAMPLE:
+		// (before the current stretch of the conversion, the song restarts, which also restarts the conversion)
+		if (pos < _smplBase)
+			Reset();
 		pos = Sample2Tick(pos);
 		// fall through
 	case PLAYPOS_TICK:
@@ -812,7 +852,8 @@ UINT8 SPCPlayer::SeekToTick(UINT32 tick)
 	if (tick > _playTick && ! _devices.empty() && _devices[0].base.defInf.dataPtr != NULL)
 	{
 		DEV_INFO* devInf = &_devices[0].base.defInf;
-		UINT32 todo = tick - _playTick;
+		// the frames of the audio unit: the ticks of the song are those of speed 1
+		UINT32 todo = (UINT32)((UINT64)(tick - _playTick) * 1000 / _speedNum);
 
 		while(todo > 0)
 		{

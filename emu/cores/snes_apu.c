@@ -81,6 +81,12 @@
 //   - The libvgm device and the mute mask (see above and snes_dsp.c); the C++ has no
 //     device. The machine itself is unchanged.
 //   - snes_apu_load_spc() keeps the DSP mute mask, which is not part of the C++ state.
+//   - The timers can run at another speed (RWF_TEMPO, SNES_APU.timer_speed, for the playback speed of the
+//     player): the stage-1 ticks of the three timers then come from accumulators that add the speed every
+//     cycle, instead of from the master counter. A music driver counts its tempo with the timers, so the
+//     tempo changes and the pitch (the DSP) does not; the CPU, the DSP and what the driver times with its own
+//     instructions run as before. At the normal speed (0, the default) the machine is the C++'s, the new
+//     fields are not read, and the output is unchanged. The speed survives a load; the accumulators do not.
 //   - snes_apu_load_spc() writes the dumped KON byte back through the DSP's CPU write, so the
 //     voices it names key on at the first poll. The C++ leaves the key-on latch clear and those
 //     voices stay silent until the driver keys them again (the opening notes of most dumps).
@@ -140,6 +146,10 @@
 // The native sample rate of the DSP, which is the device's.
 #define SNES_APU_RATE		32000
 
+// The stage-1 periods of the timers in cycles, in 1/65536 cycle (for timer_speed): timers 0 and 1 128, timer 2 16.
+#define TIMER01_PERIOD		(128u << 16)
+#define TIMER2_PERIOD		(16u << 16)
+
 
 // ---- the machine ------------------------------------------------------------
 
@@ -176,6 +186,7 @@ void snes_apu_init(SNES_APU* apu)
 UINT8 snes_apu_load_spc(SNES_APU* apu, const UINT8* data, UINT32 len)
 {
 	UINT8 mute_mask;
+	UINT32 timer_speed;
 	unsigned int i;
 
 	if (len < SNES_APU_SPC_MIN_SIZE)
@@ -191,9 +202,11 @@ UINT8 snes_apu_load_spc(SNES_APU* apu, const UINT8* data, UINT32 len)
 	// shape for everything the file does not carry; the loader overlays only what it
 	// does.
 	mute_mask = apu->dsp.mute_mask;
+	timer_speed = apu->timer_speed;
 	memset(apu, 0x00, sizeof(SNES_APU));
 	snes_dsp_init(&apu->dsp);
 	apu->dsp.mute_mask = mute_mask;
+	apu->timer_speed = timer_speed;
 	apu->aux_ports[0] = 0xFF;
 	apu->aux_ports[1] = 0xFF;
 
@@ -288,12 +301,32 @@ INLINE int apu_machine_cycle(SNES_APU* apu)
 	// The clocked events, on their documented slots of the DSP's 32-cycle sample
 	// frame: T0 and T1 tick on the first slot of every fourth frame, T2 on the
 	// first slot of every half-frame, and the sample lands on the frame boundary.
-	if (phase % 128u == 1u)
+	if (apu->timer_speed == 0)
 	{
-		tick_timer(apu, 0);
-		tick_timer(apu, 1);
+		if (phase % 128u == 1u)
+		{
+			tick_timer(apu, 0);
+			tick_timer(apu, 1);
+		}
+		if (phase % 16u == 1u) tick_timer(apu, 2);
 	}
-	if (phase % 16u == 1u) tick_timer(apu, 2);
+	else
+	{
+		// another speed of the timers (see the port notes)
+		apu->timer_acc01 += apu->timer_speed;
+		while (apu->timer_acc01 >= TIMER01_PERIOD)
+		{
+			apu->timer_acc01 -= TIMER01_PERIOD;
+			tick_timer(apu, 0);
+			tick_timer(apu, 1);
+		}
+		apu->timer_acc2 += apu->timer_speed;
+		while (apu->timer_acc2 >= TIMER2_PERIOD)
+		{
+			apu->timer_acc2 -= TIMER2_PERIOD;
+			tick_timer(apu, 2);
+		}
+	}
 
 	// The DSP runs one of a sample's 32 slots this cycle; the wrap slot delivers the
 	// finished stereo frame. The RAM is writable so the echo unit can write its
@@ -459,11 +492,13 @@ static UINT8 device_start_snes_apu(const DEV_GEN_CFG* cfg, DEV_INFO* retDevInf);
 static void device_stop_snes_apu(void* info);
 static void snes_apu_write_block(void* info, UINT32 offset, UINT32 length, const UINT8* data);
 static void snes_apu_set_mute_mask(void* info, UINT32 MuteMask);
+static void snes_apu_set_tempo(void* info, INT32 speed);
 
 static DEVDEF_RWFUNC devFunc[] =
 {
 	{RWF_MEMORY | RWF_WRITE, DEVRW_BLOCK, 0, snes_apu_write_block},
 	{RWF_CHN_MUTE | RWF_WRITE, DEVRW_ALL, 0, snes_apu_set_mute_mask},
+	{RWF_TEMPO | RWF_WRITE, DEVRW_VALUE, 0, snes_apu_set_tempo},
 	{0x00, 0x00, 0, NULL}
 };
 static DEV_DEF devDef =
@@ -530,12 +565,14 @@ static void snes_apu_dev_reset(void* info)
 {
 	SNES_APU_CHIP* chip = (SNES_APU_CHIP*)info;
 	const UINT8 mute_mask = chip->apu.dsp.mute_mask;
+	const UINT32 timer_speed = chip->apu.timer_speed;
 
 	if (chip->image != NULL)
 		snes_apu_load_spc(&chip->apu, chip->image, SNES_APU_SPC_MIN_SIZE);
 	else
 		snes_apu_init(&chip->apu);
 	chip->apu.dsp.mute_mask = mute_mask;
+	chip->apu.timer_speed = timer_speed;
 }
 
 static UINT8 device_start_snes_apu(const DEV_GEN_CFG* cfg, DEV_INFO* retDevInf)
@@ -582,4 +619,14 @@ static void snes_apu_set_mute_mask(void* info, UINT32 MuteMask)
 	SNES_APU_CHIP* chip = (SNES_APU_CHIP*)info;
 
 	chip->apu.dsp.mute_mask = (UINT8)(MuteMask & 0xFF);
+}
+
+// The speed of the timers, 16.16 fixed point (0x10000 = the hardware's). The accumulators start over.
+static void snes_apu_set_tempo(void* info, INT32 speed)
+{
+	SNES_APU_CHIP* chip = (SNES_APU_CHIP*)info;
+
+	chip->apu.timer_speed = (speed <= 0 || speed == 0x10000) ? 0 : (UINT32)speed;
+	chip->apu.timer_acc01 = 0;
+	chip->apu.timer_acc2 = 0;
 }

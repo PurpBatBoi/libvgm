@@ -67,6 +67,12 @@ struct snes_apu
 	UINT8 aux_ports[2];
 	UINT16 divider;			// the master cycle counter: timer ticks and sample boundaries
 	SNES_APU_TIMER timers[3];
+	// The speed of the timers (16.16 fixed point, 0 = normal: they tick off the master counter). A music driver
+	// counts its tempo with the timers, so a faster speed is a faster tempo with the same pitch (the DSP and the
+	// CPU run as before). Not a part of the loaded state: it survives a load.
+	UINT32 timer_speed;
+	UINT32 timer_acc01;		// the progress of the 128 cycles of timers 0 and 1, in 1/65536 cycle
+	UINT32 timer_acc2;		// the progress of the 16 cycles of timer 2
 };
 
 // snes_apu_load_spc() results.
